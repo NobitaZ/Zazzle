@@ -1,0 +1,30 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    background-color: lightgrey;
+}
+
+.sideMenu {
+    background-color: #58616b;
+    max-width: 200px;
+    width: 100%;
+    position: absolute;
+    top: 64px;
+    bottom: 0;
+}
+.sideMenu nav a {
+    display: block;
+    color: white;
+    padding: 15px 20px;
+}
+.sideMenu nav a:hover {
+    background-color: green;
+}
+.sideMenu nav a.active {
+    background-color: red;
+}
+.sideMenu nav a.active {
+    border-left: 5px solid green;
+}
