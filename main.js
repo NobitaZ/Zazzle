@@ -23,7 +23,7 @@ const log = require("electron-log");
 
 //Enviroment
 process.env.NODE_ENV = "development";
-// process.env.NODE_ENV = 'production';
+// process.env.NODE_ENV = "production";
 
 let mainWindow,
     homeWindow,
@@ -121,28 +121,8 @@ function createHomeWindow() {
         },
     });
     homeWindow.removeMenu();
-    homeWindow.loadURL(path.join(__dirname, "./views/home.html"));
-    homeWindow.on("close", function () {
-        homeWindow = null;
-    });
-    const mainMenu = Menu.buildFromTemplate(myFunc.mainMenuTemplate(app));
-    Menu.setApplicationMenu(mainMenu);
-}
-
-function createHomeWindow() {
-    homeWindow = new BrowserWindow({
-        width: 1280,
-        height: 800,
-        resizable: false,
-        darkTheme: true,
-        title: "Zazzle Upload Tool",
-        webPreferences: {
-            nodeIntegration: true,
-            enableRemoteModule: true,
-        },
-    });
-    homeWindow.removeMenu();
-    homeWindow.loadURL(path.join(__dirname, "./views/home.html"));
+    // homeWindow.loadURL(path.join(__dirname, "./views/home.html"));
+    homeWindow.loadFile("./views/home.html");
     homeWindow.on("close", function () {
         homeWindow = null;
     });
@@ -162,8 +142,10 @@ function createAdminWindow() {
             enableRemoteModule: true,
         },
     });
+    adminWindow.webContents.openDevTools();
     adminWindow.removeMenu();
-    adminWindow.loadURL(path.join(__dirname, "./views/admin.html"));
+    // adminWindow.loadURL(path.join(__dirname, "./views/admin.html"));
+    adminWindow.loadFile("./views/admin.html");
     adminWindow.on("close", function () {
         adminWindow = null;
     });
@@ -184,7 +166,8 @@ function createUpdateWindow() {
         },
     });
     updateWindow.removeMenu();
-    updateWindow.loadURL(path.join(__dirname, "./views/checkUpdate.html"));
+    // updateWindow.loadURL(path.join(__dirname, "./views/checkUpdate.html"));
+    updateWindow.loadFile("./views/checkupdate.html");
     updateWindow.on("close", function () {
         updateWindow = null;
     });
@@ -203,7 +186,8 @@ function createUploadWindow() {
         },
     });
     uploadWindow.removeMenu();
-    uploadWindow.loadURL(path.join(__dirname, "./views/upload.html"));
+    // uploadWindow.loadURL(path.join(__dirname, "./views/upload.html"));
+    uploadWindow.loadFile("./views/upload.html");
     uploadWindow.on("close", function () {
         uploadWindow = null;
     });
@@ -224,7 +208,8 @@ function createImportWindow() {
         },
     });
     importWindow.removeMenu();
-    importWindow.loadURL(path.join(__dirname, "./views/import.html"));
+    // importWindow.loadURL(path.join(__dirname, "./views/import.html"));
+    importWindow.loadFile("./views/import.html");
     importWindow.on("close", function () {
         importWindow = null;
     });

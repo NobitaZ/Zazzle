@@ -4,8 +4,8 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Zazzle Tools - Admin Panel</title>
-        <link rel="stylesheet" href="bootstrap.min.css" />
-        <link rel="stylesheet" href="admin-styles.css" />
+        <link rel="stylesheet" href="./bootstrap.min.css" />
+        <link rel="stylesheet" href="./admin-styles.css" />
     </head>
     <body>
         <nav class="navbar navbar-expand-md bg-dark navbar-dark">
@@ -13,9 +13,44 @@
         </nav>
         <section id="sideMenu" class="sideMenu">
             <nav>
-                <a href="#">User</a>
-                <a href="#">IP</a>
+                <button
+                    onclick="openTab(event, 'user')"
+                    class="tablinks active"
+                >
+                    User
+                </button>
+                <button onclick="openTab(event, 'ip-address')" class="tablinks">
+                    IP
+                </button>
             </nav>
         </section>
+        <section id="container" class="container">
+            <div id="user" class="tabcontent">user</div>
+            <div id="ip-address" class="tabcontent" style="display: none">
+                ip-address
+            </div>
+        </section>
+        <script>
+            const remote = require("electron").remote;
+            const currentWindow = remote.getCurrentWindow();
+
+            console.log(document.getElementById("user"));
+            function openTab(evt, tabName) {
+                var i, tabcontent, tablinks;
+                tabcontent = document.getElementsByClassName("tabcontent");
+                for (i = 0; i < tabcontent.length; i++) {
+                    tabcontent[i].style.display = "none";
+                }
+                tablinks = document.getElementsByClassName("tablinks");
+                for (i = 0; i < tablinks.length; i++) {
+                    tablinks[i].className = tablinks[i].className.replace(
+                        " active",
+                        ""
+                    );
+                }
+                document.getElementById(tabName).style.display = "block";
+                evt.currentTarget.className += " active";
+            }
+        </script>
     </body>
 </html>

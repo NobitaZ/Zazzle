@@ -7,24 +7,35 @@ body {
 }
 
 .sideMenu {
-    background-color: #58616b;
+    background-color: #eee;
     max-width: 200px;
     width: 100%;
     position: absolute;
     top: 64px;
     bottom: 0;
 }
-.sideMenu nav a {
+.sideMenu nav button {
+    background-color: #ddd;
+    border: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    padding: 14px 16px;
+    transition: 0.3s;
     display: block;
-    color: white;
-    padding: 15px 20px;
 }
-.sideMenu nav a:hover {
-    background-color: green;
+.sideMenu nav button:hover {
+    background-color: #ccc;
 }
-.sideMenu nav a.active {
-    background-color: red;
+.sideMenu nav button.active {
+    background-color: #bbb;
+    border-left: 8px solid green;
 }
-.sideMenu nav a.active {
-    border-left: 5px solid green;
+.container {
+    max-width: 1074px;
+    width: 100%;
+    position: absolute;
+    left: 200px;
+    top: 64px;
+    bottom: 0;
 }
