@@ -1,54 +1,58 @@
 {
-  "name": "zazzle-upload-tool",
-  "version": "1.0.0",
-  "description": "",
-  "main": "main.js",
-  "build": {
-    "appId": "zazzle-upload-tool",
-    "win": {
-      "publish": [
-        "github"
-      ],
-      "target": "nsis",
-      "icon": "icon.png"
+    "name": "zazzle-upload-tool",
+    "version": "1.0.0",
+    "description": "",
+    "main": "main.js",
+    "build": {
+        "appId": "zazzle-upload-tool",
+        "win": {
+            "publish": [
+                "github"
+            ],
+            "target": "nsis",
+            "icon": "icon.png"
+        },
+        "extraResources": [
+            {
+                "from": "data",
+                "to": "data"
+            }
+        ],
+        "publish": [
+            {
+                "provider": "github",
+                "owner": "nobitaz",
+                "repo": "Zazzle"
+            }
+        ]
     },
-    "extraResources": [
-      {
-        "from": "data",
-        "to": "data"
-      }
-    ],
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "nobitaz",
-        "repo": "Zazzle"
-      }
-    ]
-  },
-  "scripts": {
-    "start": "electron .",
-    "dev": "nodemon --exec electron .",
-    "dist": "electron-builder --windows",
-    "publish": "electron-builder --windows --publish always"
-  },
-  "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "electron": "^10.1.3",
-    "electron-builder": "^22.9.1"
-  },
-  "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "csv-parse": "^4.12.0",
-    "csv-stringify": "^5.5.1",
-    "electron-log": "^4.2.4",
-    "electron-updater": "^4.3.5",
-    "getmac": "^5.16.0",
-    "mongoose": "^5.10.9",
-    "node-notifier": "^8.0.0",
-    "nodemon": "^2.0.4",
-    "public-ip": "^4.0.2",
-    "puppeteer": "^5.3.1"
-  }
+    "scripts": {
+        "start": "electron .",
+        "dev": "nodemon --exec electron .",
+        "dist": "electron-builder --windows",
+        "publish": "electron-builder --windows --publish always"
+    },
+    "author": "",
+    "license": "ISC",
+    "devDependencies": {
+        "electron": "^10.1.3",
+        "electron-builder": "^22.9.1"
+    },
+    "dependencies": {
+        "bcryptjs": "^2.4.3",
+        "csv-parse": "^4.12.0",
+        "csv-stringify": "^5.5.1",
+        "electron-log": "^4.2.4",
+        "electron-updater": "^4.3.5",
+        "getmac": "^5.16.0",
+        "mongoose": "^5.10.9",
+        "node-notifier": "^8.0.0",
+        "nodemon": "^2.0.4",
+        "public-ip": "^4.0.2",
+        "puppeteer": "^5.3.1",
+        "puppeteer-extra": "^3.1.15",
+        "puppeteer-extra-plugin-recaptcha": "^3.1.18",
+        "puppeteer-extra-plugin-stealth": "^2.6.2",
+        "user-agents": "^1.0.559"
+    }
 }

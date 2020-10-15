@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link
+            rel="stylesheet"
+            href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+            integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"
+            crossorigin="anonymous"
+        />
+        <link rel="stylesheet" href="styles.css" />
+        <title>Zazzle Upload Tool</title>
+        <style>
+            body {
+                font-family: "Varela Round", sans-serif;
+            }
+            .row {
+                margin-right: 0px;
+            }
+        </style>
+    </head>
+
+    <body>
+        <nav class="navbar navbar-expand-md bg-dark navbar-dark">
+            <label class="navbar-brand">Zazzle Upload Tool</label>
+        </nav>
+        <br />
+        <div id="container">
+            <div class="row my-3">
+                <div id="upload-form" class="col-sm-6 text-center">
+                    <button
+                        class="btn btn-primary btn-xs my-xs-btn"
+                        type="button"
+                        onClick="uploadFunc()"
+                    >
+                        <span class="glyphicon glyphicon-pencil"></span>
+                        Upload</button
+                    ><br />
+                    <span id="file-name"></span>
+                </div>
+                <div class="col-sm-6 text-center">
+                    <span>Tag name</span>
+                    <input
+                        type="text"
+                        class="form-control"
+                        id="tagname"
+                        name="tagname"
+                        placeholder="Tag"
+                    />
+                    <br />
+                    <span>Image type</span> <br />
+                    <div class="form-check form-check-inline">
+                        <input
+                            class="form-check-input"
+                            type="radio"
+                            name="img-type"
+                            id="fitRadio"
+                            value="fit"
+                            checked
+                        />
+                        <label class="form-check-label" for="fitRadio">
+                            Fit
+                        </label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input
+                            class="form-check-input"
+                            type="radio"
+                            name="img-type"
+                            id="fullRadio"
+                            value="full"
+                        />
+                        <label class="form-check-label" for="fullRadio">
+                            Full
+                        </label>
+                    </div>
+                    <br />
+                    <br />
+                    <span>Marketplace Department</span>
+                    <input
+                        type="text"
+                        class="form-control"
+                        id="department"
+                        name="department"
+                        placeholder="Department"
+                    />
+                    <br />
+                    <div class="col-sm-12 text-center">
+                        <button
+                            id="btnProcess"
+                            class="btn btn-primary btn-xs my-xs-btn"
+                            type="button"
+                        >
+                            <span class="glyphicon glyphicon-pencil"></span>
+                            Submit</button
+                        ><br />
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            const electron = require("electron").remote;
+            const { dialog } = electron;
+            const { ipcRenderer } = require("electron");
+            const parse = require("csv-parse");
+            const path = require("path");
+            const fs = require("fs");
+
+            const fileName = document.getElementById("file-name");
+            let tagName = document.getElementById("tagname");
+            tagName.value = "anime,my hero academia";
+            let departmentName = document.getElementById("department");
+            departmentName.value = "test";
+            let imgType = document.querySelector('[name="img-type"]:checked');
+            let arrImgs = {};
+            function uploadFunc() {
+                const regexStr = /([^\\]+$)/;
+                const imgs = dialog.showOpenDialogSync({
+                    title: "Image Upload",
+                    properties: ["openFile", "multiSelections"],
+                    filters: [
+                        {
+                            name: "Images",
+                            extensions: ["jpg", "png", "rgb"],
+                        },
+                    ],
+                });
+                arrImgs = imgs;
+                fileName.innerHTML = "";
+                imgs.forEach((imgPath) => {
+                    var imgName = imgPath.split(regexStr);
+                    fileName.innerHTML += imgName[1] + "<br>";
+                });
+            }
+
+            const btnProcess = document.getElementById("btnProcess");
+            btnProcess.addEventListener("click", function (e) {
+                e.preventDefault;
+                if (
+                    arrImgs == null ||
+                    arrImgs == "" ||
+                    JSON.stringify(arrImgs) == "{}"
+                ) {
+                    const errMsgBox = dialog.showErrorBox(
+                        "No Images Selected !!!",
+                        ""
+                    );
+                } else if (tagName.value == "") {
+                    const errMsgBox = dialog.showErrorBox(
+                        "No Tag Name !!!",
+                        ""
+                    );
+                } else if (!tagName.value.includes(",")) {
+                    const errMsgBox = dialog.showErrorBox(
+                        "Wrong format Tag Name !!!",
+                        ""
+                    );
+                } else if (departmentName.value == "") {
+                    const errMsgBox = dialog.showErrorBox(
+                        "No Marketplace Department !!!",
+                        ""
+                    );
+                } else {
+                    const items = [
+                        arrImgs,
+                        tagName.value,
+                        imgType.value,
+                        departmentName.value,
+                    ];
+                    ipcRenderer.send("upload-clicked", items);
+                }
+            });
+        </script>
+    </body>
+</html>

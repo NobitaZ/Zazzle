@@ -32,6 +32,7 @@
         </section>
         <script>
             const remote = require("electron").remote;
+            const ipc = require("electron").ipcRenderer;
             const currentWindow = remote.getCurrentWindow();
 
             console.log(document.getElementById("user"));

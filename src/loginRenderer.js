@@ -3,7 +3,7 @@ const { ipcRenderer } = electron;
 const app = electron.remote;
 let username = document.querySelector("#username");
 let password = document.querySelector("#password");
-username.value = "admin";
+username.value = "123";
 password.value = "123123";
 let version = window.location.hash.substring(1);
 username.focus();

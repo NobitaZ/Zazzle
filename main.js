@@ -1,4 +1,6 @@
-const puppeteer = require("puppeteer");
+const puppeteer = require("puppeteer-extra");
+const RecaptchaPlugin = require("puppeteer-extra-plugin-recaptcha");
+const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 const path = require("path");
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
@@ -15,12 +17,28 @@ const {
 } = require("electron");
 const config = require(path.join(__dirname, "./config/keys"));
 const fs = require("fs");
-// const parse = require("csv-parse");
+const parse = require("csv-parse");
 const WindowsToaster = require("node-notifier").WindowsToaster;
 const myFunc = require(path.join(__dirname, "./src/windowRenderer"));
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
+const userAgent = require("user-agents");
 
+const apiKey = "13792eb6fd79ce2901a11c0958dcd7f6";
+
+const siteDetails = {
+    sitekey: "6Lc64wwTAAAAAN_VadOkTL4pNo2PgWk008qpz1jp",
+    // sitekey: "6Lcj-R8TAAAAABs3FrRPuQhLMbp5QrHsHufzLf7b",
+    pageurl: "https://www.zazzle.com/lgn/signin",
+};
+
+puppeteer.use(
+    RecaptchaPlugin({
+        provider: { id: "2captcha", token: apiKey },
+        visualFeedback: true, // colorize reCAPTCHAs (violet = detected, green = solved)
+    })
+);
+puppeteer.use(StealthPlugin());
 //Enviroment
 process.env.NODE_ENV = "development";
 // process.env.NODE_ENV = "production";
@@ -35,9 +53,9 @@ let mainWindow,
 const db =
     process.env.NODE_ENV !== "development" ? config.mongoURI : config.localURI;
 
-//----------------------------------
+//--------------------------------------------------------------------
 // AUTO UPDATE
-//----------------------------------
+//--------------------------------------------------------------------
 autoUpdater.on("checking-for-update", () => {
     updateWindow.webContents.send("msg-update", "Checking for update...");
 });
@@ -77,9 +95,9 @@ autoUpdater.on("update-downloaded", (info) => {
     }, 3000);
 });
 
-//----------------------------------
+//--------------------------------------------------------------------
 // CREATE WINDOWS
-//----------------------------------
+//--------------------------------------------------------------------
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 500,
@@ -228,9 +246,9 @@ function connectDB(db) {
         });
 }
 
-//----------------------------------
+//--------------------------------------------------------------------
 // On ready
-//----------------------------------
+//--------------------------------------------------------------------
 if (process.env.NODE_ENV === "development") {
     app.on("ready", createWindow);
 } else {
@@ -318,3 +336,289 @@ ipcMain.on("upload-clicked", function (e, arrItems) {
     }
     uploadWindow.close();
 });
+
+//----------------------------------
+// MAIN PROCESS
+//----------------------------------
+async function mainProcess(arrAcc, arrItems) {
+    try {
+        // Variables
+        const accUsername = arrAcc[0];
+        const accPassword = arrAcc[1];
+        const proxyIP = arrAcc[2];
+        const proxyUser = arrAcc[3];
+        const proxyPass = arrAcc[4];
+        const arrImgPath = arrItems[0];
+        const imgType = arrItems[2];
+        const departmentName = arrItems[3];
+
+        // Read category
+        let categoryList = [];
+        const categoryPath =
+            process.env.NODE_ENV === "development"
+                ? "./data/category.csv"
+                : path.join(process.resourcesPath, "data/category.csv");
+        fs.readFile(categoryPath, function (err, data) {
+            if (err) {
+                log.error(err);
+            }
+            parse(data, { columns: false, trim: true }, function (err, rows) {
+                let elements = rows[0];
+                elements.forEach((element) => {
+                    categoryList.push(element);
+                });
+            });
+        });
+
+        // Read product
+        let wallArtList = [];
+        const productPath =
+            process.env.NODE_ENV === "development"
+                ? "./data/product.csv"
+                : path.join(process.resourcesPath, "data/product.csv");
+        fs.readFile(productPath, function (err, data) {
+            if (err) {
+                log.error(err);
+            }
+            parse(data, { columns: false, trim: true }, function (err, rows) {
+                let elements = rows[0];
+                elements.forEach((element) => {
+                    wallArtList.push(element);
+                });
+            });
+        });
+
+        // Read tag
+        var tagListArr = [];
+        var arrTags = [];
+        var tagNameVal = arrItems[1].split(",");
+        var nicheVal = tagNameVal[0].trim();
+        var subNicheVal = tagNameVal[1].trim();
+        var nicheIndex = 0;
+        var nextNicheIndex = 0;
+        const tagsPath =
+            process.env.NODE_ENV === "development"
+                ? "./data/tags.csv"
+                : path.join(process.resourcesPath, "data/tags.csv");
+        fs.readFile(tagsPath, function (err, data) {
+            if (err) {
+                log.error(err);
+            }
+            parse(data, { columns: false, trim: true }, function (err, rows) {
+                if (err) {
+                    log.error(err);
+                }
+                for (let index = 1; index < rows.length; index++) {
+                    const element = rows[index];
+                    if (element[0].trim() == nicheVal) {
+                        nicheIndex = index;
+                        continue;
+                    }
+                    if (
+                        element[0] != "" &&
+                        index > nicheIndex &&
+                        nicheIndex != 0
+                    ) {
+                        nextNicheIndex = index;
+                        break;
+                    }
+                }
+                if (nextNicheIndex == 0 && nicheIndex != 0) {
+                    for (let index = 1; index < rows.length; index++) {
+                        const element = rows[index];
+                        if (element[1].trim() == subNicheVal) {
+                            arrTags.push(element[2].trim());
+                            break;
+                        }
+                    }
+                } else {
+                    for (let i = nicheIndex; i < nextNicheIndex; i++) {
+                        const element = rows[i];
+                        if (element[1].trim() == subNicheVal) {
+                            arrTags.push(element[2].trim());
+                            break;
+                        }
+                    }
+                }
+            });
+        });
+
+        setTimeout(() => {
+            if (typeof arrTags[0] != "undefined") {
+                tagListArr = arrTags[0].split(" ");
+            } else {
+                tagListArr = [];
+            }
+        }, 12000);
+
+        //Browser handlers
+        const { browser, page } = await openBrowser(proxyIP);
+        if (proxyUser.trim() != "" && proxyPass.trim() != "") {
+            await page.authenticate({
+                username: proxyUser,
+                password: proxyPass,
+            });
+        }
+
+        // await page.setUserAgent(userAgent.toString());
+        await page.setDefaultNavigationTimeout(0);
+        await page.goto(`https://www.zazzle.com/lgn/signin`, {
+            waitUntil: "networkidle2",
+        });
+        await myFunc.timeOutFunc(1000);
+        const humanCapt = await page.evaluate(() => {
+            let pageTitle = document.querySelector(".page-title");
+            let result = false;
+            if (pageTitle != null) {
+                result = true;
+            }
+            return result;
+        });
+        if (humanCapt) {
+            console.log("resolving humanCapt");
+            await page.solveRecaptchas();
+            console.log("resolved humanCapt");
+            await Promise.all([
+                page.waitForNavigation({ waitUntil: "networkidle2" }),
+            ]).catch((error) => {
+                log.error(error);
+            });
+        }
+        await myFunc.timeOutFunc(5000);
+        await page.evaluate(() => {
+            let btnLogin = document.getElementById("page_signin");
+            if (btnLogin != null) {
+                if (btnLogin.disabled) {
+                    btnLogin.disabled = false;
+                }
+            }
+        });
+        const siteCapt = await page.evaluate(() => {
+            let grecaptcha = document.getElementById("g-recaptcha-response");
+            let result = false;
+            if (grecaptcha != null) {
+                result = true;
+            }
+            return result;
+        });
+        if (siteCapt) {
+            await page.type("#page_username-input", accUsername);
+            await myFunc.timeOutFunc(1000);
+            await page.type("#page_password-input", accPassword);
+            console.log("resolving siteCapt");
+            await page.solveRecaptchas();
+            console.log("resolved siteCapt");
+            await myFunc.timeOutFunc(1000);
+            await Promise.all([
+                page.click("#page_signin"),
+                page.waitForNavigation({ waitUntil: "networkidle2" }),
+            ]).catch((error) => {
+                log.error(error);
+            });
+        } else {
+            await page.type("#page_username-input", accUsername);
+            await myFunc.timeOutFunc(1000);
+            await page.type("#page_password-input", accPassword);
+            await myFunc.timeOutFunc(1000);
+            await Promise.all([
+                page.click("#page_signin"),
+                page.waitForNavigation({ waitUntil: "networkidle2" }),
+            ]).catch((error) => {
+                log.error(error);
+            });
+        }
+    } catch (error) {
+        log.error(error);
+    }
+}
+
+//--------------------------------------------------------------------
+// BROWSER
+//--------------------------------------------------------------------
+async function openBrowser(proxy) {
+    ip = proxy.split(":")[0];
+    var port = "";
+    typeof proxy.split(":")[1] == "undefined"
+        ? (port = "4444")
+        : (port = proxy.split(":")[1]);
+
+    const chromePath =
+        process.env.NODE_ENV === "development"
+            ? puppeteer.executablePath()
+            : path.join(
+                  process.resourcesPath,
+                  "app.asar.unpacked/node_modules/puppeteer/.local-chromium/win64-800071/chrome-win/chrome.exe"
+              );
+    const browser = await puppeteer.launch({
+        executablePath: chromePath,
+        headless: false,
+        defaultViewport: null,
+        ignoreHTTPSErrors: true,
+        slowMo: 20,
+        args: [`--proxy-server=http://${ip}:${port}`],
+        //--disable-web-security "--window-size=1500,900"
+    });
+    console.log("Browser opened");
+    await homeWindow.webContents.send("logs", "Browser openned");
+    const page = await browser.newPage();
+    let item = { browser: browser, page: page };
+    return item;
+}
+
+async function closeBrowser(browser) {
+    await browser.close();
+    await homeWindow.webContents.send("logs", "Browser closed");
+    await homeWindow.webContents.send("logs", "Upload Completed !!!");
+    console.log(`Browser closed!`);
+}
+
+//----------------------------------------------------------------
+// CAPTCHA BYPASS
+//----------------------------------------------------------------
+async function initiateCaptchaRequest(apiKey, sitekey) {
+    const formData = {
+        method: "userrecaptcha",
+        googlekey: sitekey,
+        key: apiKey,
+        pageurl: siteDetails.pageurl,
+        json: 1,
+    };
+    console.log(`Submitting to 2captcha...`);
+    const response = await request.post("http://2captcha.com/in.php", {
+        form: formData,
+    });
+    console.log(`requestID: ${JSON.parse(response).request}`);
+    return JSON.parse(response).request;
+}
+
+async function pollForRequestResults(
+    key,
+    id,
+    retries = 30,
+    interval = 5000,
+    delay = 12000
+) {
+    console.log(`Waiting for ${delay}ms`);
+    await myFunc.timeOutFunc(delay);
+    return poll({
+        taskFn: requestCaptchaResults(key, id),
+        interval,
+        retries,
+    });
+}
+
+function requestCaptchaResults(apiKey, requestId) {
+    // const url = `http://2captcha.com/res.php?key=${apiKey}&action=get&id=64965318307&json=1`;
+    const url = `http://2captcha.com/res.php?key=${apiKey}&action=get&id=${requestId}&json=1`;
+    return async function () {
+        return new Promise(async function (resolve, reject) {
+            console.log(`Polling for response...`);
+            const rawResponse = await request.get(url);
+            const resp = JSON.parse(rawResponse);
+            console.log(resp);
+            if (resp.status === 0) return reject(resp.request);
+            console.log(`Response received...`);
+            resolve(resp.request);
+        });
+    };
+}

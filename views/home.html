@@ -7,6 +7,9 @@
         <link rel="stylesheet" href="styles.css" />
         <title>Zazzle Upload Tool</title>
         <style>
+            .hidetext {
+                -webkit-text-security: disc; /* Default */
+            }
             /* Style the tab */
             .tab {
                 overflow: hidden;
@@ -59,6 +62,12 @@
                 top: 0;
                 width: 100%;
             }
+            .input-category {
+                width: 300px;
+            }
+            .btnCateSave {
+                margin-top: 10px;
+            }
         </style>
     </head>
 
@@ -66,14 +75,6 @@
         <div id="divTest"></div>
         <nav class="navbar navbar-expand-md bg-dark navbar-dark">
             <label class="navbar-brand">Zazzle Upload Tool</label>
-            <!-- <button
-                style="display: none"
-                class="btn btn-success btn-xs my-xs-btn btnAdmin"
-                type="button"
-                onclick="importFunc()"
-            >
-                <span class="glyphicon glyphicon-pencil"></span> Admin Panel
-            </button> -->
         </nav>
         <br />
         <!-- Tab links -->
@@ -83,6 +84,9 @@
             </button>
             <button class="tablinks" onclick="openTab(event, 'product')">
                 Products
+            </button>
+            <button class="tablinks" onclick="openTab(event, 'category')">
+                Category
             </button>
             <button class="tablinks" onclick="openTab(event, 'logs')">
                 Logs
@@ -120,11 +124,28 @@
             <button
                 class="btn btn-primary btn-xs my-xs-btn btnSave"
                 type="button"
-                onclick="saveFunc()"
+                onclick="saveProductFunc()"
             >
                 <span class="glyphicon glyphicon-pencil"></span> Save
             </button>
             <div id="msg-product"></div>
+        </div>
+
+        <div id="category" class="tabcontent">
+            <h3>Category</h3>
+            <input
+                type="text"
+                class="input-category form-control"
+                id="input-category"
+            />
+            <button
+                class="btn btn-primary btn-xs my-xs-btn btnCateSave"
+                type="button"
+                onclick="saveCategoryFunc()"
+            >
+                <span class="glyphicon glyphicon-pencil"></span> Save
+            </button>
+            <div style="margin-top: 10px" id="msg-cate"></div>
         </div>
 
         <div id="logs" class="tabcontent">
@@ -154,12 +175,18 @@
             //         }
             //     });
 
-            var tableRef = document
+            let tableRef = document
                 .getElementById("userTable")
                 .getElementsByTagName("tbody")[0];
-            var productArea = document.getElementById("product-area");
-            var ul = document.querySelector("ul");
+            let productArea = document.getElementById("product-area");
+            let ul = document.querySelector("ul");
+            let categoryInput = document.getElementById("input-category");
             const msgDiv = document.querySelector("#msg-product");
+            const msgCate = document.querySelector("#msg-cate");
+            const categoryPath =
+                process.env.NODE_ENV === "development"
+                    ? "./data/category.csv"
+                    : path.join(process.resourcesPath, "data/category.csv");
             ipcRenderer.on("logs", function (e, item) {
                 const li = document.createElement("li");
                 const itemText = document.createTextNode(item);
@@ -188,8 +215,15 @@
                             var dataJson = JSON.stringify(elements);
                             var str =
                                 "<th scope='row'>" + index.toString() + "</th>";
-                            elements.forEach((element) => {
-                                str += "<td>" + element + "</td>";
+                            elements.forEach((element, index) => {
+                                if (index == 1 || index == 4) {
+                                    str +=
+                                        "<td class='hidetext'>" +
+                                        element +
+                                        "</td>";
+                                } else {
+                                    str += "<td>" + element + "</td>";
+                                }
                             });
                             str +=
                                 `<td><button class='btn btn-primary btn-xs my-xs-btn' type='button' onClick='selectFunc(` +
@@ -220,6 +254,24 @@
                     });
                 });
             });
+            fs.readFile(categoryPath, function (err, data) {
+                if (err) {
+                    throw err;
+                }
+                parse(data, { columns: false, trim: true }, function (
+                    err,
+                    rows
+                ) {
+                    const elements = rows[0];
+                    elements.forEach((element, index) => {
+                        if (index == elements.length - 1) {
+                            categoryInput.value += element;
+                        } else {
+                            categoryInput.value += element + ",";
+                        }
+                    });
+                });
+            });
             function openTab(evt, tabName) {
                 var i, tabcontent, tablinks;
                 tabcontent = document.getElementsByClassName("tabcontent");
@@ -245,13 +297,18 @@
                 }
                 ipcRenderer.send("select-clicked", arrayData);
             }
-            function saveFunc() {
+            function saveProductFunc() {
                 let columns = {
                     product: "Product",
                 };
-                let textSplit = productArea.value.split("\n").filter((v) => {
-                    return v != "";
-                });
+                let textSplit = productArea.value
+                    .split("\n")
+                    .filter((v) => {
+                        return v != "";
+                    })
+                    .map((v) => {
+                        return v.trim();
+                    });
                 let data = [];
                 data.push(textSplit);
                 stringify(data, function (err, output) {
@@ -272,6 +329,42 @@
                         msgDiv.innerHTML = "Successfully Saved";
                         setTimeout(() => {
                             msgDiv.style.display = "none";
+                        }, 2000);
+                    });
+                });
+            }
+            function saveCategoryFunc() {
+                let columns = {
+                    product: "Category",
+                };
+                let textSplit = categoryInput.value
+                    .split(",")
+                    .filter((v) => {
+                        return v != "";
+                    })
+                    .map((v) => {
+                        return v.trim();
+                    });
+                let data = [];
+                data.push(textSplit);
+                stringify(data, function (err, output) {
+                    const categoryPath =
+                        process.env.NODE_ENV === "development"
+                            ? "./data/category.csv"
+                            : path.join(
+                                  process.resourcesPath,
+                                  "data/category.csv"
+                              );
+                    fs.writeFile(categoryPath, output, function (err) {
+                        if (err) {
+                            throw err;
+                        }
+                        msgCate.style.display = "flex";
+                        msgCate.className =
+                            "alert alert-success alert-dismissible show";
+                        msgCate.innerHTML = "Successfully Saved";
+                        setTimeout(() => {
+                            msgCate.style.display = "none";
                         }, 2000);
                     });
                 });
