@@ -6,15 +6,7 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const User = require(path.join(__dirname, "models/User"));
 const Logs = require(path.join(__dirname, "models/Logs"));
-const {
-    app,
-    BrowserWindow,
-    Menu,
-    ipcMain,
-    remote,
-    dialog,
-    session,
-} = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, remote, dialog, session } = require("electron");
 const config = require(path.join(__dirname, "./config/keys"));
 const fs = require("fs");
 const parse = require("csv-parse");
@@ -43,15 +35,9 @@ puppeteer.use(StealthPlugin());
 process.env.NODE_ENV = "development";
 // process.env.NODE_ENV = "production";
 
-let mainWindow,
-    homeWindow,
-    uploadWindow,
-    importWindow,
-    updateWindow,
-    adminWindow;
+let mainWindow, homeWindow, uploadWindow, importWindow, updateWindow, adminWindow;
 
-const db =
-    process.env.NODE_ENV !== "development" ? config.mongoURI : config.localURI;
+const db = process.env.NODE_ENV !== "development" ? config.mongoURI : config.localURI;
 
 //--------------------------------------------------------------------
 // AUTO UPDATE
@@ -63,33 +49,21 @@ autoUpdater.on("update-available", (info) => {
     updateWindow.webContents.send("msg-update", "Update available");
 });
 autoUpdater.on("update-not-available", (info) => {
-    updateWindow.webContents.send(
-        "msg-update",
-        "You are using the latest version"
-    );
+    updateWindow.webContents.send("msg-update", "You are using the latest version");
     setTimeout(() => {
         createWindow();
         updateWindow.close();
     }, 1000);
 });
 autoUpdater.on("error", (err) => {
-    updateWindow.webContents.send(
-        "msg-update",
-        "Error in auto-updater. " + err
-    );
+    updateWindow.webContents.send("msg-update", "Error in auto-updater. " + err);
 });
 autoUpdater.on("download-progress", (progressObj) => {
     updateWindow.webContents.send("msg-update", "Downloading update...");
-    updateWindow.webContents.send(
-        "download-progress",
-        Math.round(progressObj.percent)
-    );
+    updateWindow.webContents.send("download-progress", Math.round(progressObj.percent));
 });
 autoUpdater.on("update-downloaded", (info) => {
-    updateWindow.webContents.send(
-        "msg-update",
-        "Update downloaded...Install in 3s"
-    );
+    updateWindow.webContents.send("msg-update", "Update downloaded...Install in 3s");
     setTimeout(() => {
         autoUpdater.quitAndInstall();
     }, 3000);
@@ -108,9 +82,7 @@ function createWindow() {
             enableRemoteModule: true,
         },
     });
-    mainWindow.loadURL(
-        path.join(__dirname, `./views/login.html#v${app.getVersion()}`)
-    );
+    mainWindow.loadURL(path.join(__dirname, `./views/login.html#v${app.getVersion()}`));
     mainWindow.on("closed", function () {
         mainWindow = null;
     });
@@ -128,7 +100,7 @@ function createWindow() {
 
 function createHomeWindow() {
     homeWindow = new BrowserWindow({
-        width: 1280,
+        width: 1000,
         height: 800,
         resizable: false,
         darkTheme: true,
@@ -202,6 +174,7 @@ function createUploadWindow() {
             nodeIntegration: true,
             enableRemoteModule: true,
         },
+        parent: homeWindow,
     });
     uploadWindow.removeMenu();
     // uploadWindow.loadURL(path.join(__dirname, "./views/upload.html"));
@@ -224,6 +197,7 @@ function createImportWindow() {
             nodeIntegration: true,
             enableRemoteModule: true,
         },
+        parent: homeWindow,
     });
     importWindow.removeMenu();
     // importWindow.loadURL(path.join(__dirname, "./views/import.html"));
@@ -323,7 +297,7 @@ ipcMain.on("import-clicked", function (e, item) {
 });
 
 ipcMain.on("import-success", function (e, item) {
-    importWindow.close();
+    importWindow.hide();
     homeWindow.webContents.send("reload-acc-info", "reload");
 });
 
@@ -371,7 +345,7 @@ async function mainProcess(arrAcc, arrItems) {
         });
 
         // Read product
-        let wallArtList = [];
+        let productList = [];
         const productPath =
             process.env.NODE_ENV === "development"
                 ? "./data/product.csv"
@@ -383,19 +357,19 @@ async function mainProcess(arrAcc, arrItems) {
             parse(data, { columns: false, trim: true }, function (err, rows) {
                 let elements = rows[0];
                 elements.forEach((element) => {
-                    wallArtList.push(element);
+                    productList.push(element);
                 });
             });
         });
 
         // Read tag
-        var tagListArr = [];
-        var arrTags = [];
-        var tagNameVal = arrItems[1].split(",");
-        var nicheVal = tagNameVal[0].trim();
-        var subNicheVal = tagNameVal[1].trim();
-        var nicheIndex = 0;
-        var nextNicheIndex = 0;
+        let tagListArr = [];
+        let arrTags = [];
+        let tagNameVal = arrItems[1].split(",");
+        let nicheVal = tagNameVal[0].trim();
+        let subNicheVal = tagNameVal[1].trim();
+        let nicheIndex = 0;
+        let nextNicheIndex = 0;
         const tagsPath =
             process.env.NODE_ENV === "development"
                 ? "./data/tags.csv"
@@ -414,11 +388,7 @@ async function mainProcess(arrAcc, arrItems) {
                         nicheIndex = index;
                         continue;
                     }
-                    if (
-                        element[0] != "" &&
-                        index > nicheIndex &&
-                        nicheIndex != 0
-                    ) {
+                    if (element[0] != "" && index > nicheIndex && nicheIndex != 0) {
                         nextNicheIndex = index;
                         break;
                     }
@@ -451,6 +421,42 @@ async function mainProcess(arrAcc, arrItems) {
             }
         }, 12000);
 
+        let productLink = {};
+        setTimeout(() => {
+            let productTest = productList[0];
+            let splitProduct = productTest.split("->").map((v) => {
+                return v.trim();
+            });
+            let productPrice =
+                typeof splitProduct[4] !== "undefined"
+                    ? splitProduct[4]
+                    : splitProduct[3].includes("$")
+                    ? splitProduct[3]
+                    : "";
+            console.log(`splitProduct: ${splitProduct}`);
+            const link1stPath =
+                process.env.NODE_ENV === "development"
+                    ? "./data/1stlink.csv"
+                    : path.join(process.resourcesPath, "data/1stlink.csv");
+            fs.readFile(link1stPath, function (err, data) {
+                if (err) {
+                    log.error(err);
+                }
+                parse(data, { columns: false, trim: true }, function (err, rows) {
+                    if (err) {
+                        log.error(err);
+                    }
+                    let filterProduct = rows.filter((row) => {
+                        return row[1].trim() == splitProduct[0].trim();
+                    })[0];
+                    if (filterProduct != null && typeof filterProduct != "undefined") {
+                        productLink.firstLink = "https://www.zazzle.com/custom/" + filterProduct[0];
+                    }
+                    console.log(productLink);
+                });
+            });
+        }, 1000);
+
         //Browser handlers
         const { browser, page } = await openBrowser(proxyIP);
         if (proxyUser.trim() != "" && proxyPass.trim() != "") {
@@ -469,22 +475,20 @@ async function mainProcess(arrAcc, arrItems) {
         const humanCapt = await page.evaluate(() => {
             let pageTitle = document.querySelector(".page-title");
             let result = false;
-            if (pageTitle != null) {
-                result = true;
-            }
+            pageTitle != null ? (result = true) : (result = false);
             return result;
         });
         if (humanCapt) {
             console.log("resolving humanCapt");
+            await homeWindow.webContents.send("logs", "Resolving captcha...");
             await page.solveRecaptchas();
+            await homeWindow.webContents.send("logs", "Resolved captcha");
             console.log("resolved humanCapt");
-            await Promise.all([
-                page.waitForNavigation({ waitUntil: "networkidle2" }),
-            ]).catch((error) => {
+            await Promise.all([page.waitForNavigation()]).catch((error) => {
                 log.error(error);
             });
         }
-        await myFunc.timeOutFunc(5000);
+        await myFunc.timeOutFunc(1000);
         await page.evaluate(() => {
             let btnLogin = document.getElementById("page_signin");
             if (btnLogin != null) {
@@ -496,9 +500,7 @@ async function mainProcess(arrAcc, arrItems) {
         const siteCapt = await page.evaluate(() => {
             let grecaptcha = document.getElementById("g-recaptcha-response");
             let result = false;
-            if (grecaptcha != null) {
-                result = true;
-            }
+            grecaptcha != null ? (result = true) : (result = false);
             return result;
         });
         if (siteCapt) {
@@ -506,13 +508,12 @@ async function mainProcess(arrAcc, arrItems) {
             await myFunc.timeOutFunc(1000);
             await page.type("#page_password-input", accPassword);
             console.log("resolving siteCapt");
+            await homeWindow.webContents.send("logs", "Resolving captcha...");
             await page.solveRecaptchas();
+            await homeWindow.webContents.send("logs", "Resolved captcha");
             console.log("resolved siteCapt");
             await myFunc.timeOutFunc(1000);
-            await Promise.all([
-                page.click("#page_signin"),
-                page.waitForNavigation({ waitUntil: "networkidle2" }),
-            ]).catch((error) => {
+            await Promise.all([page.click("#page_signin"), page.waitForNavigation()]).catch((error) => {
                 log.error(error);
             });
         } else {
@@ -520,13 +521,80 @@ async function mainProcess(arrAcc, arrItems) {
             await myFunc.timeOutFunc(1000);
             await page.type("#page_password-input", accPassword);
             await myFunc.timeOutFunc(1000);
-            await Promise.all([
-                page.click("#page_signin"),
-                page.waitForNavigation({ waitUntil: "networkidle2" }),
-            ]).catch((error) => {
+            await Promise.all([page.click("#page_signin"), page.waitForNavigation()]).catch((error) => {
                 log.error(error);
             });
         }
+        await homeWindow.webContents.send("logs", `Login success: ${accUsername}`);
+
+        // Upload images
+        await page.goto("https://www.zazzle.com/lgn/signin?mlru=images");
+        const originCounter = await page.evaluate(() => {
+            return parseInt(
+                document.querySelectorAll(".MediaBrowserExplorer-subViews button")[0].textContent.match(/\d+/g)[0]
+            );
+        });
+        const [fileChooser] = await Promise.all([
+            page.waitForFileChooser(),
+            page.evaluate(() => {
+                document.querySelector(".FileInput-activeInput").click();
+            }),
+        ]).catch((error) => {
+            log.error(error);
+        });
+        await fileChooser.accept(arrImgPath);
+        await homeWindow.webContents.send("logs", `Uploading ${arrImgPath.length} images...`);
+        console.log(`Uploading ${arrImgPath.length} images...`);
+        await myFunc.timeOutFunc(5000);
+        await page.waitForFunction(
+            (imgCout) => {
+                let counter = document.querySelectorAll(".MediaBrowserExplorer-subViews button");
+                let result = false;
+                if (counter != null) {
+                    if (parseInt(counter[0].textContent.match(/\d+/g)[0]) == imgCout) {
+                        result = true;
+                    }
+                }
+                return result;
+            },
+            {},
+            arrImgPath.length + originCounter
+        );
+        await homeWindow.webContents.send("logs", `Successfully Uploaded`);
+        console.log(`Successfully Uploaded`);
+        await myFunc.timeOutFunc(1000);
+
+        // Go to store
+        // await page.hover('[title="My Account"]');
+        // await page.waitForSelector(".RecognizedUserHeaderFlyout-userLinkList");
+        // const storeName = await page.evaluate(() => {
+        //     let name = document.querySelectorAll(
+        //         ".RecognizedUserHeaderFlyout-userLinkList"
+        //     );
+        //     if (name != null && typeof(name) != "undefined") {
+        //         return name[1].children[1].children[0] + "/products";
+        //     } else {
+        //         return "";
+        //     }
+        // });
+        // await myFunc.timeOutFunc(500);
+        // let storeNameExist = true;
+        // if (storeName != "") {
+        //     console.log(`store name existed: ${storeName}`);
+        //     await page.goto(storeName);
+        // } else {
+        //     await page.goto("https://www.zazzle.com/lgn/signin?mlrus=stores");
+        //     console.log("store name doesn't existed");
+        //     storeNameExist = false;
+        // }
+        // if (!storeNameExist) {
+        //     const productLink = await page.$$(".StoreCard-name");
+        //     await page.goto(`${productLink[0].href}/products`);
+        // }
+
+        // Add product
+
+        await page.goto(productLink.firstLink);
     } catch (error) {
         log.error(error);
     }
@@ -537,10 +605,8 @@ async function mainProcess(arrAcc, arrItems) {
 //--------------------------------------------------------------------
 async function openBrowser(proxy) {
     ip = proxy.split(":")[0];
-    var port = "";
-    typeof proxy.split(":")[1] == "undefined"
-        ? (port = "4444")
-        : (port = proxy.split(":")[1]);
+    let port = "";
+    typeof proxy.split(":")[1] == "undefined" ? (port = "4444") : (port = proxy.split(":")[1]);
 
     const chromePath =
         process.env.NODE_ENV === "development"
@@ -591,13 +657,7 @@ async function initiateCaptchaRequest(apiKey, sitekey) {
     return JSON.parse(response).request;
 }
 
-async function pollForRequestResults(
-    key,
-    id,
-    retries = 30,
-    interval = 5000,
-    delay = 12000
-) {
+async function pollForRequestResults(key, id, retries = 30, interval = 5000, delay = 12000) {
     console.log(`Waiting for ${delay}ms`);
     await myFunc.timeOutFunc(delay);
     return poll({
