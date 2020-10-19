@@ -421,40 +421,57 @@ async function mainProcess(arrAcc, arrItems) {
             }
         }, 12000);
 
-        let productLink = {};
-        setTimeout(() => {
-            let productTest = productList[0];
-            let splitProduct = productTest.split("->").map((v) => {
-                return v.trim();
-            });
-            let productPrice =
-                typeof splitProduct[4] !== "undefined"
-                    ? splitProduct[4]
-                    : splitProduct[3].includes("$")
-                    ? splitProduct[3]
-                    : "";
-            console.log(`splitProduct: ${splitProduct}`);
-            const link1stPath =
-                process.env.NODE_ENV === "development"
-                    ? "./data/1stlink.csv"
-                    : path.join(process.resourcesPath, "data/1stlink.csv");
-            fs.readFile(link1stPath, function (err, data) {
+        let linkList = [];
+        let productArr = [];
+        const link1stPath =
+            process.env.NODE_ENV === "development"
+                ? "./data/1stlink.csv"
+                : path.join(process.resourcesPath, "data/1stlink.csv");
+        // Read prodcut from file
+        fs.readFile(link1stPath, function (err, data) {
+            if (err) {
+                log.error(err);
+            }
+            parse(data, { columns: false, trim: true }, function (err, rows) {
                 if (err) {
                     log.error(err);
                 }
-                parse(data, { columns: false, trim: true }, function (err, rows) {
-                    if (err) {
-                        log.error(err);
-                    }
-                    let filterProduct = rows.filter((row) => {
-                        return row[1].trim() == splitProduct[0].trim();
-                    })[0];
-                    if (filterProduct != null && typeof filterProduct != "undefined") {
-                        productLink.firstLink = "https://www.zazzle.com/custom/" + filterProduct[0];
-                    }
-                    console.log(productLink);
-                });
+                linkList = rows;
             });
+        });
+        setTimeout(() => {
+            for (let index = 0; index < productList.length; index++) {
+                let product = {};
+                let productEle = productList[index];
+                let splitProduct = productEle.split("->").map((v) => {
+                    return v.trim();
+                });
+                product.price =
+                    typeof splitProduct[3] !== "undefined"
+                        ? splitProduct[3]
+                        : typeof splitProduct[2] !== "undefined"
+                        ? splitProduct[2].includes("$")
+                            ? splitProduct[2]
+                            : ""
+                        : "";
+
+                product.secondProduct = typeof splitProduct[1] !== "undefined" ? splitProduct[1] : "";
+                product.thirdProduct =
+                    typeof splitProduct[2] !== "undefined"
+                        ? splitProduct[2].includes("$")
+                            ? ""
+                            : splitProduct[2]
+                        : "";
+                console.log(`splitProduct: ${splitProduct}`);
+                let filterProduct = linkList.find((row) => {
+                    return row[1].trim() == splitProduct[0].trim();
+                })[0];
+                if (filterProduct != null && typeof filterProduct != "undefined") {
+                    product.firstLink = "https://www.zazzle.com/custom/" + filterProduct;
+                }
+                productArr.push(product);
+            }
+            console.log(productArr);
         }, 1000);
 
         //Browser handlers
@@ -557,44 +574,69 @@ async function mainProcess(arrAcc, arrItems) {
                 }
                 return result;
             },
-            {},
+            { timeout: 0 },
             arrImgPath.length + originCounter
         );
         await homeWindow.webContents.send("logs", `Successfully Uploaded`);
         console.log(`Successfully Uploaded`);
         await myFunc.timeOutFunc(1000);
+        async function getSecondLink(element, page, secondLinkArr) {
+            let ele = await page.evaluate((element) => {
+                let productLinkEle = [
+                    ...document.querySelectorAll(
+                        'a[id^="page_cmsContent_zWidget"].ZazzleCollectionItemCellProduct-titleLink'
+                    ),
+                ];
+                let result = [];
+                let links = productLinkEle.filter((v) => {
+                    return (
+                        v.text == element.secondProduct && v.parentNode.nextElementSibling.textContent == element.price
+                    );
+                });
 
-        // Go to store
-        // await page.hover('[title="My Account"]');
-        // await page.waitForSelector(".RecognizedUserHeaderFlyout-userLinkList");
-        // const storeName = await page.evaluate(() => {
-        //     let name = document.querySelectorAll(
-        //         ".RecognizedUserHeaderFlyout-userLinkList"
-        //     );
-        //     if (name != null && typeof(name) != "undefined") {
-        //         return name[1].children[1].children[0] + "/products";
-        //     } else {
-        //         return "";
-        //     }
-        // });
-        // await myFunc.timeOutFunc(500);
-        // let storeNameExist = true;
-        // if (storeName != "") {
-        //     console.log(`store name existed: ${storeName}`);
-        //     await page.goto(storeName);
-        // } else {
-        //     await page.goto("https://www.zazzle.com/lgn/signin?mlrus=stores");
-        //     console.log("store name doesn't existed");
-        //     storeNameExist = false;
-        // }
-        // if (!storeNameExist) {
-        //     const productLink = await page.$$(".StoreCard-name");
-        //     await page.goto(`${productLink[0].href}/products`);
-        // }
+                if (links != "") {
+                    links.forEach((v) => {
+                        result.push(v.href);
+                    });
+                }
+                return result;
+            }, element);
+            secondLinkArr.push(...ele);
+        }
 
         // Add product
+        for (let index = 0; index < productArr.length; index++) {
+            let secondLinkArr = [];
+            const element = productArr[index];
+            await page.goto(element.firstLink);
+            await myFunc.timeOutFunc(500);
+            const numberOfPage = await page.evaluate(() => {
+                return parseInt(
+                    document.querySelector(".ZazzlePagination-pageDisplay").textContent.match(/(\d+)(?!.*\d)/gm)
+                );
+            });
 
-        await page.goto(productLink.firstLink);
+            await getSecondLink(element, page, secondLinkArr);
+            for (let i = 2; i <= numberOfPage; i++) {
+                console.log(`Goto page ${i}`);
+                await page.goto(element.firstLink + `?pg=${i}`);
+                await getSecondLink(element, page, secondLinkArr);
+            }
+            if (secondLinkArr == "") {
+                throw new Error("Can not find second link");
+            }
+            for (let i = 0; i < secondLinkArr.length; i++) {
+                await page.goto(secondLinkArr[i]);
+                await page.$eval(".DesignPod-customizeControls", (ele) => {
+                    ele.children[0].click();
+                });
+                await myFunc.timeOutFunc(500);
+                // await page.$eval(".Z4DSContentPanelBase-bigBlueButton", (ele) => {
+                //     ele.children[0].click();
+                // });
+                await page.click(".Z4DSContentPanelBase-bigBlueButton");
+            }
+        }
     } catch (error) {
         log.error(error);
     }
@@ -668,7 +710,6 @@ async function pollForRequestResults(key, id, retries = 30, interval = 5000, del
 }
 
 function requestCaptchaResults(apiKey, requestId) {
-    // const url = `http://2captcha.com/res.php?key=${apiKey}&action=get&id=64965318307&json=1`;
     const url = `http://2captcha.com/res.php?key=${apiKey}&action=get&id=${requestId}&json=1`;
     return async function () {
         return new Promise(async function (resolve, reject) {
