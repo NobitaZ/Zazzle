@@ -29,11 +29,7 @@
         <div id="container">
             <div class="row my-3">
                 <div id="upload-form" class="col-sm-6 text-center">
-                    <button
-                        class="btn btn-primary btn-xs my-xs-btn"
-                        type="button"
-                        onClick="uploadFunc()"
-                    >
+                    <button class="btn btn-primary btn-xs my-xs-btn" type="button" onClick="uploadFunc()">
                         <span class="glyphicon glyphicon-pencil"></span>
                         Upload</button
                     ><br />
@@ -41,13 +37,7 @@
                 </div>
                 <div class="col-sm-6 text-center">
                     <span>Tag name</span>
-                    <input
-                        type="text"
-                        class="form-control"
-                        id="tagname"
-                        name="tagname"
-                        placeholder="Tag"
-                    />
+                    <input type="text" class="form-control" id="tagname" name="tagname" placeholder="Tag" />
                     <br />
                     <span>Image type</span> <br />
                     <div class="form-check form-check-inline">
@@ -59,21 +49,11 @@
                             value="fit"
                             checked
                         />
-                        <label class="form-check-label" for="fitRadio">
-                            Fit
-                        </label>
+                        <label class="form-check-label" for="fitRadio"> Fit </label>
                     </div>
                     <div class="form-check form-check-inline">
-                        <input
-                            class="form-check-input"
-                            type="radio"
-                            name="img-type"
-                            id="fullRadio"
-                            value="full"
-                        />
-                        <label class="form-check-label" for="fullRadio">
-                            Full
-                        </label>
+                        <input class="form-check-input" type="radio" name="img-type" id="fullRadio" value="full" />
+                        <label class="form-check-label" for="fullRadio"> Full </label>
                     </div>
                     <br />
                     <br />
@@ -87,11 +67,7 @@
                     />
                     <br />
                     <div class="col-sm-12 text-center">
-                        <button
-                            id="btnProcess"
-                            class="btn btn-primary btn-xs my-xs-btn"
-                            type="button"
-                        >
+                        <button id="btnProcess" class="btn btn-primary btn-xs my-xs-btn" type="button">
                             <span class="glyphicon glyphicon-pencil"></span>
                             Submit</button
                         ><br />
@@ -111,7 +87,8 @@
             let tagName = document.getElementById("tagname");
             tagName.value = "anime,my hero academia";
             let departmentName = document.getElementById("department");
-            departmentName.value = "test";
+            departmentName.value =
+                "Office & School > Promotional Products & Small Business Supplies > Signs & Posters > Posters & Prints";
             let imgType = document.querySelector('[name="img-type"]:checked');
             let arrImgs = {};
             function uploadFunc() {
@@ -161,37 +138,16 @@
             const btnProcess = document.getElementById("btnProcess");
             btnProcess.addEventListener("click", function (e) {
                 e.preventDefault;
-                if (
-                    arrImgs == null ||
-                    arrImgs == "" ||
-                    JSON.stringify(arrImgs) == "{}"
-                ) {
-                    const errMsgBox = dialog.showErrorBox(
-                        "No Images Selected !!!",
-                        ""
-                    );
+                if (arrImgs == null || arrImgs == "" || JSON.stringify(arrImgs) == "{}") {
+                    const errMsgBox = dialog.showErrorBox("No Images Selected !!!", "");
                 } else if (tagName.value == "") {
-                    const errMsgBox = dialog.showErrorBox(
-                        "No Tag Name !!!",
-                        ""
-                    );
+                    const errMsgBox = dialog.showErrorBox("No Tag Name !!!", "");
                 } else if (!tagName.value.includes(",")) {
-                    const errMsgBox = dialog.showErrorBox(
-                        "Wrong format Tag Name !!!",
-                        ""
-                    );
+                    const errMsgBox = dialog.showErrorBox("Wrong format Tag Name !!!", "");
                 } else if (departmentName.value == "") {
-                    const errMsgBox = dialog.showErrorBox(
-                        "No Marketplace Department !!!",
-                        ""
-                    );
+                    const errMsgBox = dialog.showErrorBox("No Marketplace Department !!!", "");
                 } else {
-                    const items = [
-                        arrImgs,
-                        tagName.value,
-                        imgType.value,
-                        departmentName.value,
-                    ];
+                    const items = [arrImgs, tagName.value, imgType.value, departmentName.value];
                     ipcRenderer.send("upload-clicked", items);
                 }
             });

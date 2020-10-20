@@ -92,7 +92,7 @@ function createWindow() {
     } else {
         setTimeout(() => {
             connectDB(db);
-        }, 1000);
+        }, 500);
     }
     const mainMenu = Menu.buildFromTemplate(myFunc.mainMenuTemplate(app));
     Menu.setApplicationMenu(mainMenu);
@@ -325,6 +325,7 @@ async function mainProcess(arrAcc, arrItems) {
         const arrImgPath = arrItems[0];
         const imgType = arrItems[2];
         const departmentName = arrItems[3];
+        const regexStr = /([^\\]+)(?=\.\w+$)/;
 
         // Read category
         let categoryList = [];
@@ -339,7 +340,7 @@ async function mainProcess(arrAcc, arrItems) {
             parse(data, { columns: false, trim: true }, function (err, rows) {
                 let elements = rows[0];
                 elements.forEach((element) => {
-                    categoryList.push(element);
+                    categoryList.push(element.trim());
                 });
             });
         });
@@ -546,6 +547,7 @@ async function mainProcess(arrAcc, arrItems) {
 
         // Upload images
         await page.goto("https://www.zazzle.com/lgn/signin?mlru=images");
+        //get image counter
         const originCounter = await page.evaluate(() => {
             return parseInt(
                 document.querySelectorAll(".MediaBrowserExplorer-subViews button")[0].textContent.match(/\d+/g)[0]
@@ -554,6 +556,7 @@ async function mainProcess(arrAcc, arrItems) {
         const [fileChooser] = await Promise.all([
             page.waitForFileChooser(),
             page.evaluate(() => {
+                //Input file chooser
                 document.querySelector(".FileInput-activeInput").click();
             }),
         ]).catch((error) => {
@@ -565,6 +568,7 @@ async function mainProcess(arrAcc, arrItems) {
         await myFunc.timeOutFunc(5000);
         await page.waitForFunction(
             (imgCout) => {
+                // get image cout after upload to compare
                 let counter = document.querySelectorAll(".MediaBrowserExplorer-subViews button");
                 let result = false;
                 if (counter != null) {
@@ -580,6 +584,8 @@ async function mainProcess(arrAcc, arrItems) {
         await homeWindow.webContents.send("logs", `Successfully Uploaded`);
         console.log(`Successfully Uploaded`);
         await myFunc.timeOutFunc(1000);
+
+        // Get all link to get second link
         async function getSecondLink(element, page, secondLinkArr) {
             let ele = await page.evaluate((element) => {
                 let productLinkEle = [
@@ -615,8 +621,9 @@ async function mainProcess(arrAcc, arrItems) {
                     document.querySelector(".ZazzlePagination-pageDisplay").textContent.match(/(\d+)(?!.*\d)/gm)
                 );
             });
-
+            //get link page 1
             await getSecondLink(element, page, secondLinkArr);
+            //get link other pages
             for (let i = 2; i <= numberOfPage; i++) {
                 console.log(`Goto page ${i}`);
                 await page.goto(element.firstLink + `?pg=${i}`);
@@ -626,15 +633,185 @@ async function mainProcess(arrAcc, arrItems) {
                 throw new Error("Can not find second link");
             }
             for (let i = 0; i < secondLinkArr.length; i++) {
-                await page.goto(secondLinkArr[i]);
-                await page.$eval(".DesignPod-customizeControls", (ele) => {
-                    ele.children[0].click();
-                });
-                await myFunc.timeOutFunc(500);
-                // await page.$eval(".Z4DSContentPanelBase-bigBlueButton", (ele) => {
-                //     ele.children[0].click();
-                // });
-                await page.click(".Z4DSContentPanelBase-bigBlueButton");
+                for (let j = 0; j < arrImgPath.length; j++) {
+                    let imgPath = arrImgPath[j];
+                    let imgName = imgPath.replace(/^.*[\\\/]/, "");
+                    let imgDirname = path.dirname(imgPath);
+                    let imgNameInChars = imgPath
+                        .match(regexStr)[0]
+                        .replace(/-/g, " ")
+                        .replace(/[^a-zA-Z ]/g, "")
+                        .trim();
+                    let imgNameInCharsSplit = imgNameInChars.split(" ");
+                    imgNameInCharsSplit.forEach((element) => {
+                        if (tagListArr != "") {
+                            tagListArr.splice(0, 0, element);
+                        } else {
+                            tagListArr.push(element);
+                        }
+                    });
+                    console.log(`imgPath: ${imgPath}`);
+                    console.log(`imgName: ${imgName}`);
+                    console.log(`imgDirname: ${imgDirname}`);
+                    console.log(`imgNameInChars: ${imgNameInChars}`);
+                    console.log(`imgNameInCharsSplit: ${imgNameInCharsSplit}`);
+                    console.log(`tagListArr: ${tagListArr}`);
+                    await page.goto(secondLinkArr[i], {
+                        waitUntil: "networkidle2",
+                    });
+                    //Click Add Image
+                    await myFunc.timeOutFunc(2000);
+                    await page.waitForSelector(".DesignPod-customizeControls");
+                    await page.evaluate(() => {
+                        const AddImagesBtn = document.querySelector(".DesignPod-customizeControls");
+                        AddImagesBtn.children[0].click();
+                    });
+                    // await page.$eval(".DesignPod-customizeControls", (ele) => {
+                    //     ele.children[0].click();
+                    // });
+                    await page.waitForSelector(".Z4DSContentPanelBase-bigBlueButton");
+                    //Click Open full image browser
+                    await page.click(".Z4DSContentPanelBase-bigBlueButton");
+                    //Choose image
+                    await page.waitForSelector(`img.JustifiedGridItem-image[alt="${imgName}"]`);
+                    await page.click(`img.JustifiedGridItem-image[alt="${imgName}"]`);
+                    await myFunc.timeOutFunc(2000);
+                    let dialogSize = await page.evaluate(() => {
+                        const dialogBody = document.querySelector(".Dialog-body");
+                        let result = false;
+                        if (dialogBody != null) {
+                            //Select size dialog
+                            let dialogOption = [
+                                ...document.querySelector(".Dialog-body>div>div>fieldset>div").children,
+                            ];
+                            for (let i = 0; i < dialogOption.length; i++) {
+                                if (dialogOption[i].textContent.includes("Use my image to resize to the nearest")) {
+                                    dialogOption[i].children[0].click();
+                                    result = true;
+                                    break;
+                                }
+                            }
+                        } else {
+                            result = false;
+                        }
+                        if (result) {
+                            setTimeout(() => {
+                                let continueBtn = document.querySelector(".Dialog-buttonBar");
+                                continueBtn.firstElementChild.click();
+                            }, 1000);
+                        }
+                        //Click button continue after select size if size dialog exist
+                    });
+
+                    // if (dialogSize) {
+                    //     await page.waitForSelector(".Dialog-buttonBar");
+                    //     await page.evaluate(() => {
+                    //         let continueButton = document.querySelector(".Dialog-buttonBar");
+                    //         continueButton.firstElementChild.click();
+                    //     });
+                    //     // await page.click(".Dialog-buttonBar>button");
+                    // }
+                    await myFunc.timeOutFunc(500);
+                    await page.waitForSelector(".Z4DSPropertiesPanelBase-duplexRow");
+                    await page.evaluate((imgType) => {
+                        //Choose image type: Fill or Fit
+                        const fillFitButton = document.querySelector(".Z4DSPropertiesPanelBase-duplexRow");
+                        if (fillFitButton.children[0].children[1].textContent == imgType) {
+                            fillFitButton.children[0].click();
+                        } else {
+                            fillFitButton.children[1].click();
+                        }
+                        return true;
+                    }, imgType);
+                    await myFunc.timeOutFunc(500);
+                    // Click button Done
+                    await page.waitForSelector(".Z4ColorButton--blue");
+                    await page.click(".Z4ColorButton--blue");
+                    await myFunc.timeOutFunc(500);
+                    await page.waitForSelector("button.Button_root__HighVisibility");
+                    await Promise.all([
+                        // Click Sell It
+                        page.click("button.Button_root__HighVisibility"),
+                        page.waitForNavigation(),
+                    ]).catch((error) => {
+                        log.error(error);
+                    });
+                    // Type title
+                    await page.waitForSelector("#page_postForSaleForm_elements_productTitle-input");
+                    await page.type("#page_postForSaleForm_elements_productTitle-input", imgNameInChars);
+                    // choose Marketplace Department
+                    let fillDep = await page.evaluate((departmentName) => {
+                        const suggestedDepartment = document.querySelectorAll(
+                            '[id^="page_postForSaleForm_elements_department_suggestedDepartments_value"].ZazzleSelectorValueDisplay-displayName'
+                        );
+                        suggestedDepartment.forEach((v) => {
+                            if (v.textContent == departmentName) {
+                                v.click();
+                                return true;
+                            }
+                        });
+                        return false;
+                    }, departmentName);
+                    if (!fillDep) {
+                        homeWindow.webContents.send("logs", `Can not find department to choose`);
+                    }
+                    //select Store Category
+                    await page.waitForSelector("#page_postForSaleForm_elements_cnProductLine-folderPath");
+                    let isValidCategory = await page.evaluate((categoryList) => {
+                        let categoryName = document.querySelector(
+                            "#page_postForSaleForm_elements_cnProductLine-folderPath"
+                        );
+                        let result = false;
+                        //check exist category
+                        if (categoryName.textContent.trim() == categoryList[0] + " > " + categoryList[1]) {
+                            result = true;
+                        } else {
+                            //open select category dialog
+                            document
+                                .querySelector("#page_postForSaleForm_elements_cnProductLine-selectCategory")
+                                .click();
+                            result = false;
+                        }
+                        return result;
+                    }, categoryList);
+                    await myFunc.timeOutFunc(2000);
+                    if (!isValidCategory) {
+                        await myFunc.timeOutFunc(1000);
+                        //check first category
+                        await page.waitForSelector(".ZazzleCollectionItemFolderNavigationPane-links");
+                        await page.evaluate((categoryList) => {
+                            let leftCategorySection = [
+                                ...document.querySelector(".ZazzleCollectionItemFolderNavigationPane-links>div>div")
+                                    .children,
+                            ];
+                            leftCategorySection.forEach((v) => {
+                                if (v.firstElementChild.textContent.trim() == categoryList[0]) {
+                                    v.firstElementChild.click();
+                                    setTimeout(() => {
+                                        let rightCategorySection = [
+                                            ...document.querySelectorAll(
+                                                ".ZazzleCollectionItemFolderNavigationPane-links>div>div"
+                                            )[1].children,
+                                        ];
+                                        rightCategorySection.forEach((ele) => {
+                                            if (ele.firstElementChild.children[0].textContent == categoryList[0]) {
+                                                ele.firstElementChild.children[0].click();
+                                                setTimeout(() => {
+                                                    document.querySelector("#page_categoryBrowserDialog_ok").click();
+                                                }, 1000);
+                                            } else {
+                                                return;
+                                            }
+                                        });
+                                    }, 1000);
+                                } else {
+                                    return;
+                                }
+                            });
+                        }, categoryList);
+                        //TODOS
+                    }
+                }
             }
         }
     } catch (error) {
