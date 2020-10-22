@@ -31,8 +31,8 @@ puppeteer.use(
 puppeteer.use(StealthPlugin());
 
 //Enviroment
-process.env.NODE_ENV = "development";
-// process.env.NODE_ENV = "production";
+// process.env.NODE_ENV = "development";
+process.env.NODE_ENV = "production";
 
 let mainWindow, homeWindow, uploadWindow, importWindow, updateWindow, adminWindow;
 
