@@ -225,10 +225,11 @@ function connectDB(db) {
 if (process.env.NODE_ENV === "development") {
     app.on("ready", createWindow);
 } else {
-    autoUpdater.checkForUpdatesAndNotify();
     app.on("ready", createUpdateWindow);
 }
-
+app.on("ready", function () {
+    autoUpdater.checkForUpdatesAndNotify();
+});
 app.on("window-all-closed", function () {
     if (process.platform !== "darwin") {
         app.quit();
