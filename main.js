@@ -14,6 +14,8 @@ const WindowsToaster = require("node-notifier").WindowsToaster;
 const myFunc = require(path.join(__dirname, "./src/windowRenderer"));
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
+const getmac = require("getmac");
+const publicIp = require("public-ip");
 
 const apiKey = "13792eb6fd79ce2901a11c0958dcd7f6";
 
@@ -31,10 +33,12 @@ puppeteer.use(
 puppeteer.use(StealthPlugin());
 
 //Enviroment
-// process.env.NODE_ENV = "development";
-process.env.NODE_ENV = "production";
+process.env.NODE_ENV = "development";
+// process.env.NODE_ENV = "production";
 
 let mainWindow, homeWindow, uploadWindow, importWindow, updateWindow, adminWindow;
+
+let publicIPObj = {};
 
 const db = process.env.NODE_ENV !== "development" ? config.mongoURI : config.remoteDB;
 
@@ -93,6 +97,9 @@ function createWindow() {
             connectDB(db);
         }, 500);
     }
+    const ip_adds = (async () => {
+        publicIPObj.ip = await publicIp.v4();
+    })();
     const mainMenu = Menu.buildFromTemplate(myFunc.mainMenuTemplate(app));
     Menu.setApplicationMenu(mainMenu);
 }
@@ -121,7 +128,7 @@ function createHomeWindow() {
 
 function createAdminWindow() {
     adminWindow = new BrowserWindow({
-        width: 1280,
+        width: 1200,
         height: 800,
         resizable: false,
         darkTheme: true,
@@ -131,7 +138,7 @@ function createAdminWindow() {
             enableRemoteModule: true,
         },
     });
-    adminWindow.webContents.openDevTools();
+    // adminWindow.webContents.openDevTools();
     adminWindow.removeMenu();
     // adminWindow.loadURL(path.join(__dirname, "./views/admin.html"));
     adminWindow.loadFile("./views/admin.html");
@@ -208,9 +215,10 @@ function createImportWindow() {
 
 function connectDB(db) {
     mongoose
-        .connect(db, { useNewUrlParser: true, useUnifiedTopology: true })
+        .connect(db, { keepAlive: true, useNewUrlParser: true, useUnifiedTopology: true })
         .then(() => {
             mainWindow.webContents.send("db", "connected");
+            global.dbConnection = global.dbConnection ? global.dbConnection : mongoose.connection;
             console.log("MongoDB Connected");
         })
         .catch((err) => {
@@ -257,16 +265,29 @@ ipcMain.on("auth-form", function (e, item) {
         bcrypt.compare(password, user.password, (err, isMatch) => {
             if (err) log.error(err);
             if (isMatch) {
-                // session.defaultSession.cookies.set({
+                if (user.username == "admin") {
+                    createAdminWindow();
+                    mainWindow.close();
+                } else {
+                    if (getmac.default() == user.mac) {
+                        if (publicIPObj.ip == user.ip1 || publicIPObj.ip == user.ip2) {
+                            createHomeWindow();
+                            mainWindow.close();
+                        } else {
+                            mainWindow.webContents.send("msg-login", "wrong-ip");
+                            return;
+                        }
+                    } else {
+                        mainWindow.webContents.send("msg-login", "wrong-mac");
+                        return;
+                    }
+                }
+
                 //     url: "http://localhost",
+                // session.defaultSession.cookies.set({
                 //     name: username,
                 // });
-                if (user.username === "admin") {
-                    createAdminWindow();
-                } else {
-                    createHomeWindow();
-                }
-                mainWindow.close();
+
                 // const publicIp = require("public-ip");
                 // const ip_adds = (async () => {
                 //     const ip = await publicIp.v4();
@@ -309,6 +330,19 @@ ipcMain.on("upload-clicked", function (e, arrItems) {
         log.error(error);
     }
     uploadWindow.close();
+});
+
+ipcMain.on("edit-user", function (e, userInfo) {
+    console.log(userInfo);
+});
+
+ipcMain.on("logout", function (e, item) {
+    createWindow();
+    if (item == "logoutAdmin") {
+        adminWindow.close();
+    } else if (item == "logout") {
+        homeWindow.close();
+    }
 });
 
 //----------------------------------
@@ -1003,49 +1037,6 @@ async function closeBrowser(browser) {
     console.log(`Browser closed!`);
 }
 
-//----------------------------------------------------------------
-// CAPTCHA BYPASS
-//----------------------------------------------------------------
-async function initiateCaptchaRequest(apiKey, sitekey) {
-    const formData = {
-        method: "userrecaptcha",
-        googlekey: sitekey,
-        key: apiKey,
-        pageurl: siteDetails.pageurl,
-        json: 1,
-    };
-    console.log(`Submitting to 2captcha...`);
-    const response = await request.post("http://2captcha.com/in.php", {
-        form: formData,
-    });
-    console.log(`requestID: ${JSON.parse(response).request}`);
-    return JSON.parse(response).request;
-}
-
-async function pollForRequestResults(key, id, retries = 30, interval = 5000, delay = 12000) {
-    console.log(`Waiting for ${delay}ms`);
-    await myFunc.timeOutFunc(delay);
-    return poll({
-        taskFn: requestCaptchaResults(key, id),
-        interval,
-        retries,
-    });
-}
-
-function requestCaptchaResults(apiKey, requestId) {
-    const url = `http://2captcha.com/res.php?key=${apiKey}&action=get&id=${requestId}&json=1`;
-    return async function () {
-        return new Promise(async function (resolve, reject) {
-            console.log(`Polling for response...`);
-            const rawResponse = await request.get(url);
-            const resp = JSON.parse(rawResponse);
-            console.log(resp);
-            if (resp.status === 0) return reject(resp.request);
-            console.log(`Response received...`);
-            resolve(resp.request);
-        });
-    };
-}
 //Custom Functions
 async function select1stCategory(page, categoryList) {
     //select 1st category if exist

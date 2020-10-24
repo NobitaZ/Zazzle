@@ -3,7 +3,7 @@ const { ipcRenderer } = electron;
 const app = electron.remote;
 let username = document.querySelector("#username");
 let password = document.querySelector("#password");
-username.value = "123";
+username.value = "admin";
 password.value = "123123";
 let version = window.location.hash.substring(1);
 username.focus();
@@ -16,7 +16,6 @@ function submitForm(e) {
         password: password.value,
     };
 
-    console.log(ipcRenderer);
     ipcRenderer.send("auth-form", items);
 }
 const msgDiv = document.querySelector("#msg-cus");
@@ -36,6 +35,20 @@ ipcRenderer.on("msg-login", function (e, item) {
         username.focus();
         msgDiv.className += "alert alert-danger alert-dismissible show";
         msgDiv.innerHTML = "Incorrect Password";
+    } else if (item == "wrong-mac") {
+        msgDiv.className = "";
+        username.value = "";
+        password.value = "";
+        username.focus();
+        msgDiv.className += "alert alert-danger alert-dismissible show";
+        msgDiv.innerHTML = "Wrong MAC, please contact your Admin";
+    } else if (item == "wrong-ip") {
+        msgDiv.className = "";
+        username.value = "";
+        password.value = "";
+        username.focus();
+        msgDiv.className += "alert alert-danger alert-dismissible show";
+        msgDiv.innerHTML = "Wrong IP Address, please contact Admin";
     }
 });
 ipcRenderer.on("db", function (e, item) {
