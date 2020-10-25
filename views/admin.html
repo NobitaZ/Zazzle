@@ -6,28 +6,9 @@
         <title>Zazzle Tools - Admin Panel</title>
         <link rel="stylesheet" href="./bootstrap.min.css" />
         <link rel="stylesheet" href="./admin-styles.css" />
-        <style>
-            .hidetext {
-                -webkit-text-security: disc; /* Default */
-            }
-            #myInput {
-                /* background-image: url("/css/searchicon.png"); */
-                background-position: 10px 10px;
-                background-repeat: no-repeat;
-                width: 92%;
-                font-size: 16px;
-                padding: 12px 20px 12px 40px;
-                border: 3px solid #ddd;
-                margin-top: 12px;
-                margin-bottom: 12px;
-            }
-            .btnLogout {
-                margin-left: 830px;
-            }
-        </style>
     </head>
     <body>
-        <nav class="navbar navbar-expand-md bg-dark navbar-dark">
+        <nav class="navbar navbar-expand-md bg-dark navbar-dark fixed-top">
             <label class="navbar-brand">Zazzle Tools - Admin Panel</label>
             <button class="btn btn-secondary btn-xs my-xs-btn btnLogout" type="button" onclick="logoutFunc()">
                 <span class="glyphicon glyphicon-pencil"> Logout </span>
@@ -57,7 +38,7 @@
                             <th scope="col">MAC</th>
                             <th scope="col">IP Address 1</th>
                             <th scope="col">IP Address 2</th>
-                            <th scope="col">Function</th>
+                            <th scope="col"></th>
                         </tr>
                     </thead>
                     <tbody id="tableBody"></tbody>
@@ -106,7 +87,10 @@
                                         (` +
                                     dataJson +
                                     `)' >` +
-                                    "<span class='glyphicon glyphicon-pencil'></span> Edit </button></td>";
+                                    "<span class='glyphicon glyphicon-pencil'></span> Edit </button>";
+                                str +=
+                                    `<button style='margin-left:10px' class='btn btn-danger btn-xs my-xs-btn' type='button' onClick='deleteUserFunc("${element.username}")'>` +
+                                    "<span class='glyphicon glyphicon-pencil'></span> Delete </button></td>";
                                 tableRef.insertRow().innerHTML = str;
                             }
                         }
@@ -119,8 +103,30 @@
             function editUserFunc(userInfo) {
                 ipcRenderer.send("edit-user", userInfo);
             }
+            function deleteUserFunc(username) {
+                const { remote } = require("electron");
+                const dialog = remote.dialog;
+                let WIN = remote.getCurrentWindow();
+                var options = {
+                    type: "question",
+                    buttons: ["&Yes", "&No"],
+                    title: "Confirm Delete User",
+                    normalizeAccessKeys: true,
+                    message: `Do you really want to delete "${username}"?`,
+                };
+                dialog
+                    .showMessageBox(WIN, options)
+                    .then((choice) => {
+                        if (choice.response === 0) {
+                            ipcRenderer.send("delete-user", username);
+                        }
+                    })
+                    .catch((err) => {
+                        console.log("ERROR", err);
+                    });
+            }
             function searchFunc() {
-                var input, filter, table, tr, td, i, txtValue;
+                let input, filter, table, tr, td, i, txtValue;
                 input = document.getElementById("myInput");
                 filter = input.value.toUpperCase();
                 table = document.getElementById("userTable");
@@ -158,6 +164,22 @@
                     .catch((err) => {
                         console.log("ERROR", err);
                     });
+            }
+            ipcRenderer.on("user-modified", function (e, item) {
+                tableRef.innerHTML = "";
+                readUserInfo();
+            });
+            window.onscroll = function () {
+                stickyHeader();
+            };
+            var searchBar = document.getElementById("myInput");
+            var sticky = searchBar.offsetTop;
+            function stickyHeader() {
+                if (window.pageYOffset >= sticky) {
+                    searchBar.classList.add("sticky");
+                } else {
+                    searchBar.classList.remove("sticky");
+                }
             }
         </script>
     </body>

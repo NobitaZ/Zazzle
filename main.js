@@ -33,10 +33,10 @@ puppeteer.use(
 puppeteer.use(StealthPlugin());
 
 //Enviroment
-process.env.NODE_ENV = "development";
-// process.env.NODE_ENV = "production";
+// process.env.NODE_ENV = "development";
+process.env.NODE_ENV = "production";
 
-let mainWindow, homeWindow, uploadWindow, importWindow, updateWindow, adminWindow;
+let mainWindow, homeWindow, uploadWindow, importWindow, updateWindow, adminWindow, editUserWindow;
 
 let publicIPObj = {};
 
@@ -86,6 +86,7 @@ function createWindow() {
         },
     });
     mainWindow.loadURL(path.join(__dirname, `./views/login.html#v${app.getVersion()}`));
+    // mainWindow.loadFile(`./views/login.html#v${app.getVersion()}`);
     mainWindow.on("closed", function () {
         mainWindow = null;
     });
@@ -95,7 +96,7 @@ function createWindow() {
     } else {
         setTimeout(() => {
             connectDB(db);
-        }, 500);
+        }, 1000);
     }
     const ip_adds = (async () => {
         publicIPObj.ip = await publicIp.v4();
@@ -195,7 +196,7 @@ function createUploadWindow() {
 function createImportWindow() {
     importWindow = new BrowserWindow({
         width: 600,
-        height: 400,
+        height: 600,
         resizable: false,
         darkTheme: true,
         title: "Society Upload Tool",
@@ -210,6 +211,27 @@ function createImportWindow() {
     importWindow.loadFile("./views/import.html");
     importWindow.on("close", function () {
         importWindow = null;
+    });
+}
+
+function createEditUserWindow() {
+    editUserWindow = new BrowserWindow({
+        width: 500,
+        height: 580,
+        resizable: false,
+        darkTheme: true,
+        title: "Zazzle Upload Tool",
+        webPreferences: {
+            nodeIntegration: true,
+            enableRemoteModule: true,
+        },
+        parent: adminWindow,
+    });
+    editUserWindow.removeMenu();
+    // uploadWindow.loadURL(path.join(__dirname, "./views/upload.html"));
+    editUserWindow.loadFile("./views/edituser.html");
+    editUserWindow.on("close", function () {
+        editUserWindow = null;
     });
 }
 
@@ -234,6 +256,7 @@ if (process.env.NODE_ENV === "development") {
     app.on("ready", createWindow);
 } else {
     app.on("ready", createUpdateWindow);
+    // autoUpdater.checkForUpdatesAndNotify();
 }
 app.on("ready", function () {
     autoUpdater.checkForUpdatesAndNotify();
@@ -265,16 +288,24 @@ ipcMain.on("auth-form", function (e, item) {
         bcrypt.compare(password, user.password, (err, isMatch) => {
             if (err) log.error(err);
             if (isMatch) {
-                if (user.username == "admin") {
+                if (user.username == "hadeptrai") {
                     createAdminWindow();
                     mainWindow.close();
                 } else {
-                    if (getmac.default() == user.mac) {
-                        if (publicIPObj.ip == user.ip1 || publicIPObj.ip == user.ip2) {
-                            createHomeWindow();
-                            mainWindow.close();
+                    if (typeof user.mac != "undefined") {
+                        let userMac = user.mac.toUpperCase().replaceAll("-", ":");
+                        if (getmac.default().toUpperCase() == userMac) {
+                            if (typeof user.ip1 != "undefined" || typeof user.ip2 != "undefined") {
+                                if (publicIPObj.ip == user.ip1 || publicIPObj.ip == user.ip2) {
+                                    createHomeWindow();
+                                    mainWindow.close();
+                                } else {
+                                    mainWindow.webContents.send("msg-login", "wrong-ip");
+                                    return;
+                                }
+                            }
                         } else {
-                            mainWindow.webContents.send("msg-login", "wrong-ip");
+                            mainWindow.webContents.send("msg-login", "wrong-mac");
                             return;
                         }
                     } else {
@@ -333,7 +364,40 @@ ipcMain.on("upload-clicked", function (e, arrItems) {
 });
 
 ipcMain.on("edit-user", function (e, userInfo) {
+    createEditUserWindow();
+    setTimeout(() => {
+        editUserWindow.webContents.send("data", userInfo);
+    }, 1000);
     console.log(userInfo);
+});
+
+ipcMain.on("delete-user", function (e, username) {
+    User.findOneAndDelete({
+        username: username,
+    }).then((user) => {
+        if (!user) {
+            return;
+        }
+        adminWindow.webContents.send("user-modified", "true");
+    });
+});
+
+ipcMain.on("data-modified", function (e, data) {
+    console.log(data);
+    User.findOneAndUpdate(
+        {
+            username: data.username,
+        },
+        { $set: data },
+        {
+            useFindAndModify: false,
+        }
+    ).then((user) => {
+        if (!user) {
+            return;
+        }
+        adminWindow.webContents.send("user-modified", "true");
+    });
 });
 
 ipcMain.on("logout", function (e, item) {
