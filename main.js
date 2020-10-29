@@ -31,8 +31,9 @@ puppeteer.use(
     })
 );
 puppeteer.use(StealthPlugin());
-
+//--------------------------------------------------------------------
 //Enviroment
+//--------------------------------------------------------------------
 // process.env.NODE_ENV = "development";
 process.env.NODE_ENV = "production";
 
@@ -297,6 +298,10 @@ ipcMain.on("auth-form", function (e, item) {
                         if (getmac.default().toUpperCase() == userMac) {
                             if (typeof user.ip1 != "undefined" || typeof user.ip2 != "undefined") {
                                 if (publicIPObj.ip == user.ip1 || publicIPObj.ip == user.ip2) {
+                                    session.defaultSession.cookies.set({
+                                        url: "http://localhost",
+                                        name: user.name,
+                                    });
                                     createHomeWindow();
                                     mainWindow.close();
                                 } else {
@@ -313,11 +318,6 @@ ipcMain.on("auth-form", function (e, item) {
                         return;
                     }
                 }
-
-                //     url: "http://localhost",
-                // session.defaultSession.cookies.set({
-                //     name: username,
-                // });
 
                 // const publicIp = require("public-ip");
                 // const ip_adds = (async () => {
@@ -406,6 +406,14 @@ ipcMain.on("logout", function (e, item) {
         adminWindow.close();
     } else if (item == "logout") {
         homeWindow.close();
+    }
+});
+
+ipcMain.on("open-account", function (e, data) {
+    try {
+        openAccount(data);
+    } catch (error) {
+        log.error(error);
     }
 });
 
@@ -1188,4 +1196,92 @@ async function getThirdLink(element, page, linkArr) {
         return result;
     }, element);
     linkArr.push(...ele);
+}
+//----------------------------------
+// OPEN ACCOUNT PROCESS
+//----------------------------------
+async function openAccount(userInfo) {
+    const accUsername = userInfo[0];
+    const accPassword = userInfo[1];
+    const proxyIP = userInfo[2];
+    const proxyUser = userInfo[3];
+    const proxyPass = userInfo[4];
+    //Browser handlers
+    const { browser, page } = await openBrowser(proxyIP);
+    if (proxyUser.trim() != "" && proxyPass.trim() != "") {
+        await page.authenticate({
+            username: proxyUser,
+            password: proxyPass,
+        });
+    }
+
+    // await page.setUserAgent(userAgent.toString());
+    await page.setDefaultNavigationTimeout(0);
+    await page.goto(`https://www.zazzle.com/lgn/signin`, {
+        waitUntil: "networkidle2",
+    });
+    await myFunc.timeOutFunc(1000);
+    const humanCapt = await page.evaluate(() => {
+        let pageTitle = document.querySelector(".page-title");
+        let result = false;
+        pageTitle != null ? (result = true) : (result = false);
+        return result;
+    });
+    if (humanCapt) {
+        console.log("resolving humanCapt");
+        await homeWindow.webContents.send("logs", "Resolving captcha...");
+        await page.solveRecaptchas();
+        await homeWindow.webContents.send("logs", "Resolved captcha");
+        console.log("resolved humanCapt");
+        await Promise.all([page.waitForNavigation()]).catch((error) => {
+            log.error(error);
+        });
+    }
+    await myFunc.timeOutFunc(1000);
+    await page.evaluate(() => {
+        let btnLogin = document.getElementById("page_signin");
+        if (btnLogin != null) {
+            if (btnLogin.disabled) {
+                btnLogin.disabled = false;
+            }
+        }
+    });
+    const siteCapt = await page.evaluate(() => {
+        let grecaptcha = document.getElementById("g-recaptcha-response");
+        let result = false;
+        grecaptcha != null ? (result = true) : (result = false);
+        return result;
+    });
+    if (siteCapt) {
+        await page.type("#page_username-input", accUsername);
+        await myFunc.timeOutFunc(1000);
+        await page.type("#page_password-input", accPassword);
+        console.log("resolving siteCapt");
+        await homeWindow.webContents.send("logs", "Resolving captcha...");
+        await page.solveRecaptchas();
+        await homeWindow.webContents.send("logs", "Resolved captcha");
+        console.log("resolved siteCapt");
+        await myFunc.timeOutFunc(1000);
+        await Promise.all([page.click("#page_signin"), page.waitForNavigation()]).catch((error) => {
+            log.error(error);
+        });
+    } else {
+        await page.type("#page_username-input", accUsername);
+        await myFunc.timeOutFunc(1000);
+        await page.type("#page_password-input", accPassword);
+        await myFunc.timeOutFunc(1000);
+        await Promise.all([page.click("#page_signin"), page.waitForNavigation()]).catch((error) => {
+            log.error(error);
+        });
+    }
+    try {
+        await page.waitForSelector('a[title="My Account"]', { timeout: 5000 });
+        await homeWindow.webContents.send("logs", `Login success: ${accUsername}`);
+    } catch (error) {
+        await homeWindow.webContents.send("logs", `Login Error: ${accUsername}`);
+        await closeBrowser(browser).catch((error) => {
+            log.error(error);
+        });
+        return;
+    }
 }

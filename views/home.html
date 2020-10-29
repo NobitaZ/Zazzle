@@ -68,17 +68,29 @@
             .btnCateSave {
                 margin-top: 10px;
             }
-            .btnLogout {
-                margin-left: 700px;
+            /* .btnLogout { */
+            /* margin-left: 20px; */
+            /* float: right; */
+            /* } */
+            .loginName {
+                max-width: 200px;
+                widows: 100%;
+                margin-left: 480px;
+                color: #fff;
             }
         </style>
     </head>
 
     <body>
         <div id="divTest"></div>
-        <nav class="navbar navbar-expand-md bg-dark navbar-dark">
+        <nav class="navbar navbar-expand-md bg-dark navbar-dark justify-content-end">
             <label class="navbar-brand">Zazzle Upload Tool</label>
-            <button class="btn btn-secondary btn-xs my-xs-btn btnLogout" type="button" onclick="logoutFunc()">
+            <span class="loginName text-right"></span>
+            <button
+                class="btn btn-secondary btn-xs my-xs-btn btnLogout ml-auto mr-1"
+                type="button"
+                onclick="logoutFunc()"
+            >
                 <span class="glyphicon glyphicon-pencil"> Logout </span>
             </button>
         </nav>
@@ -105,7 +117,7 @@
                         <th scope="col">Proxy</th>
                         <th scope="col">Proxy Username</th>
                         <th scope="col">Proxy Password</th>
-                        <th scope="col">Function</th>
+                        <th scope="col"></th>
                     </tr>
                 </thead>
                 <tbody id="tableBody"></tbody>
@@ -143,20 +155,21 @@
             const { ipcRenderer, dialog } = electron;
             const path = require("path");
             const fs = require("fs");
-            // let session = remote.session;
-            // let cookieName = [];
-            // session.defaultSession.cookies
-            //     .get({}, (err, cookie) => {
-            //         if (err) throw err;
-            //         return cookie;
-            //     })
-            //     .then((data) => {
-            //         if (data[0].name === "admin") {
-            //             const btnAdmin = document.querySelector(".btnAdmin");
-            //             btnAdmin.style.display = "flex";
-            //         }
-            //     });
-
+            let session = remote.session;
+            let cookies = [];
+            session.defaultSession.cookies
+                .get({}, (err, cookie) => {
+                    if (err) throw err;
+                    return cookie;
+                })
+                .then((data) => {
+                    cookies = data;
+                    const loginName = document.querySelector(".loginName");
+                    loginName.innerHTML = `Welcome, ${data[0].name}`;
+                });
+            setTimeout(() => {
+                console.log(cookies);
+            }, 1000);
             let tableRef = document.getElementById("userTable").getElementsByTagName("tbody")[0];
             let productArea = document.getElementById("product-area");
             let ul = document.querySelector("ul");
@@ -202,7 +215,12 @@
                                 `<td><button class='btn btn-primary btn-xs my-xs-btn' type='button' onClick='selectFunc(` +
                                 dataJson +
                                 `)' >` +
-                                "<span class='glyphicon glyphicon-pencil'></span> Upload </button></td>";
+                                "<span class='glyphicon glyphicon-pencil'></span> Upload </button>";
+                            str +=
+                                `<button style='margin-left:10px;' class='btn btn-primary btn-xs my-xs-btn' type='button' onClick='openFunc(` +
+                                dataJson +
+                                `)' >` +
+                                "<span class='glyphicon glyphicon-pencil'></span> Open </button></td>";
                             tableRef.insertRow().innerHTML = str;
                         }
                     });
@@ -352,12 +370,18 @@
                     .showMessageBox(WIN, options)
                     .then((choice) => {
                         if (choice.response === 0) {
+                            session.defaultSession.cookies.remove("http://localhost", cookies[0].name, (error) => {
+                                if (error) console.log(`error removing cookie ${cookie.name}`, error);
+                            });
                             ipcRenderer.send("logout", "logout");
                         }
                     })
                     .catch((err) => {
                         console.log("ERROR", err);
                     });
+            }
+            function openFunc(data) {
+                ipcRenderer.send("open-account", data);
             }
         </script>
     </body>
