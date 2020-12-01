@@ -1,9 +1,10 @@
 {
   "name": "zazzle-upload-tool",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "",
   "main": "main.js",
   "build": {
+    "productName": "Zazzle Upload Tool",
     "appId": "zazzle-upload-tool",
     "win": {
       "publish": [

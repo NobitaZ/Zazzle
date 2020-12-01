@@ -471,7 +471,7 @@ async function mainProcess(arrAcc, arrItems) {
         }
         for (let index = 1; index < rows.length; index++) {
           const element = rows[index];
-          if (element[0].trim() == nicheVal) {
+          if (element[0].toUpperCase().trim() == nicheVal.toUpperCase()) {
             nicheIndex = index;
             continue;
           }
@@ -483,7 +483,7 @@ async function mainProcess(arrAcc, arrItems) {
         if (nextNicheIndex == 0 && nicheIndex != 0) {
           for (let index = 1; index < rows.length; index++) {
             const element = rows[index];
-            if (element[1].trim() == subNicheVal) {
+            if (element[1].toUpperCase().trim() == subNicheVal.toUpperCase()) {
               arrTags.push(element[2].trim());
               break;
             }
@@ -491,7 +491,7 @@ async function mainProcess(arrAcc, arrItems) {
         } else {
           for (let i = nicheIndex; i < nextNicheIndex; i++) {
             const element = rows[i];
-            if (element[1].trim() == subNicheVal) {
+            if (element[1].toUpperCase().trim() == subNicheVal.toUpperCase()) {
               arrTags.push(element[2].trim());
               break;
             }
@@ -949,6 +949,7 @@ async function mainProcess(arrAcc, arrItems) {
               if (is1stCategoryExists) {
                 await select1stCategory(page, categoryList);
               } else {
+                debugger;
                 await myFunc.timeOutFunc(500);
                 await page.waitForSelector("#page_newProductLine_form_elements_name-input");
                 await page.type("#page_newProductLine_form_elements_name-input", categoryList[0]);
