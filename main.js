@@ -636,10 +636,17 @@ async function mainProcess(arrAcc, arrItems) {
 
     // Upload images
     await page.goto("https://www.zazzle.com/lgn/signin?mlru=images");
-    await page.waitForSelector(".FileInput-activeInput", { timeout: 0 });
-    await page.evaluate(() => {
-      window.stop();
-    });
+    await myFunc.timeOutFunc(3000);
+    let uploadBtn = await page.$(".FileInput-activeInput");
+    while (!uploadBtn) {
+      await page.reload();
+      await myFunc.timeOutFunc(3000);
+      await page.waitForSelector(".FileInput-activeInput", { timeout: 5000 }).catch((err) => {
+        log.error(err);
+        return;
+      });
+      uploadBtn = await page.$(".FileInput-activeInput");
+    }
     //get image counter
     const originCounter = await page.evaluate(() => {
       return parseInt(
@@ -663,10 +670,10 @@ async function mainProcess(arrAcc, arrItems) {
       .waitForFunction(
         (imgCout) => {
           // get image cout after upload to compare
-          let counter = document.querySelectorAll(".MediaBrowserExplorer-subViews button");
+          let counter = document.querySelector(".MediaBrowserExplorer-subViews>button");
           let result = false;
           if (counter != null) {
-            if (parseInt(counter[0].textContent.match(/\d+/g)[0]) == imgCout) {
+            if (parseInt(counter.textContent.match(/\d+/g)[0]) == imgCout) {
               result = true;
             }
           }
@@ -681,9 +688,7 @@ async function mainProcess(arrAcc, arrItems) {
     await myFunc.timeOutFunc(500);
     if (!imgUploadDone) {
       let imgCount = await page.evaluate(() => {
-        return parseInt(
-          document.querySelectorAll(".MediaBrowserExplorer-subViews button")[0].textContent.match(/\d+/g)[0]
-        );
+        return parseInt(document.querySelector(".MediaBrowserExplorer-subViews>button").textContent.match(/\d+/g)[0]);
       });
       let uploadedImgCount = imgCount - originCounter;
       await homeWindow.webContents.send("logs", `Uploaded ${uploadedImgCount} images`);
@@ -765,13 +770,25 @@ async function mainProcess(arrAcc, arrItems) {
           });
           //Click Add Image
           await myFunc.timeOutFunc(3000);
-          await page.waitForSelector(".DesignPod-customizeControls");
+          const soldOutErr = await page.$(".ErrorList");
+          if (soldOutErr != null) {
+            await homeWindow.webContents.send("logs", `${linkArr[i]} is sold out`);
+            continue;
+          }
+          // await page.waitForSelector(".DesignPod-customizeControls", { timeout: 10000 });
+          let addImgBtn = await page.$(".DesignPod-customizeControls");
+          while (!addImgBtn) {
+            await page.reload();
+            await myFunc.timeOutFunc(5000);
+            addImgBtn = await page.$(".DesignPod-customizeControls");
+          }
+
           await page.$eval(".DesignPod-customizeControls", (ele) => {
             ele.firstElementChild.click();
           });
           await myFunc.timeOutFunc(1000);
           try {
-            await page.waitForSelector(".Z4DSContentPanelBase-bigBlueButton", { timeout: 5000 });
+            await page.waitForSelector(".Z4DSContentPanelBase-bigBlueButton", { timeout: 10000 });
           } catch (err) {
             await page.reload({ waitUntil: ["networkidle0", "domcontentloaded"] });
             //Click Add Image
@@ -785,10 +802,11 @@ async function mainProcess(arrAcc, arrItems) {
             continue;
           }
           //Click Open full image browser
+          await myFunc.timeOutFunc(500);
           await page.click(".Z4DSContentPanelBase-bigBlueButton");
           //Choose image
+          await myFunc.timeOutFunc(1000);
           await page.waitForSelector(`img.JustifiedGridItem-image[alt="${imgName}"]`);
-          await myFunc.timeOutFunc(500);
           await page.click(`img.JustifiedGridItem-image[alt="${imgName}"]`);
           await myFunc.timeOutFunc(3000);
           let dialogSize = await page.evaluate(() => {
