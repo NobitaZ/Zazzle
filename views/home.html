@@ -40,27 +40,32 @@
 
       /* Style the tab content */
       .tabcontent {
+        width: 99.6%;
         display: none;
         padding: 6px 12px;
         border: 1px solid #ccc;
+        border-right: none;
         border-bottom: none;
+        z-index: 2;
       }
 
       /*Style the text area */
       .textarea {
-        width: 90%;
-        height: 300px;
+        width: 100%;
+        height: 150px;
         border: 1px solid #ccc;
+        border-radius: 0.25rem;
       }
 
       .btnSave {
-        margin-top: -300px;
+        width: 100%;
       }
 
       .sticky {
         position: fixed;
         top: 0;
         width: 100%;
+        z-index: 1;
       }
       .input-category {
         width: 300px;
@@ -109,10 +114,10 @@
           <tr>
             <th scope="col">ID</th>
             <th scope="col">Account</th>
-            <th scope="col">Password</th>
+            <!-- <th scope="col">Password</th> -->
             <th scope="col">Proxy</th>
             <th scope="col">Proxy Username</th>
-            <th scope="col">Proxy Password</th>
+            <!-- <th scope="col">Proxy Password</th> -->
             <th scope="col"></th>
           </tr>
         </thead>
@@ -121,12 +126,57 @@
     </div>
 
     <div id="product" class="tabcontent">
-      <h3>Products</h3>
-      <textarea id="product-area" class="textarea"></textarea>
-      <button class="btn btn-primary btn-xs my-xs-btn btnSave" type="button" onclick="saveProductFunc()">
-        <span class="glyphicon glyphicon-pencil"></span> Save
-      </button>
-      <div id="msg-product"></div>
+      <div class="row">
+        <div class="col-sm-6">
+          <h3>Products</h3>
+          <textarea id="product-area-1" class="textarea"></textarea>
+        </div>
+        <div class="col-sm-6">
+          <h3>Departments</h3>
+          <input id="department-1" type="text" class="form-control" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-sm">
+          <textarea id="product-area-2" class="textarea"></textarea>
+        </div>
+        <div class="col-sm">
+          <input id="department-2" type="text" class="form-control" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-sm">
+          <textarea id="product-area-3" class="textarea"></textarea>
+        </div>
+        <div class="col-sm">
+          <input id="department-3" type="text" class="form-control" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-sm">
+          <textarea id="product-area-4" class="textarea"></textarea>
+        </div>
+        <div class="col-sm">
+          <input id="department-4" type="text" class="form-control" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-sm">
+          <textarea id="product-area-5" class="textarea"></textarea>
+        </div>
+        <div class="col-sm">
+          <input id="department-5" type="text" class="form-control" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <button class="btn btn-primary btn-xs my-xs-btn btnSave" type="button" onclick="saveProductFunc()">
+            <span class="glyphicon glyphicon-pencil"></span> Save
+          </button>
+          <div id="msg-product"></div>
+        </div>
+      </div>
+      <!-- <textarea id="product-area" class="textarea"></textarea> -->
     </div>
 
     <div id="category" class="tabcontent">
@@ -147,6 +197,7 @@
       const stringify = require("csv-stringify");
       const parse = require("csv-parse");
       const electron = require("electron");
+      const log = require("electron-log");
       const remote = electron.remote;
       const { ipcRenderer, dialog } = electron;
       const path = require("path");
@@ -155,7 +206,9 @@
       let cookies = [];
       session.defaultSession.cookies
         .get({}, (err, cookie) => {
-          if (err) throw err;
+          if (err) {
+            log.error(err);
+          }
           return cookie;
         })
         .then((data) => {
@@ -163,11 +216,17 @@
           const loginName = document.querySelector(".loginName");
           loginName.innerHTML = `Welcome, ${data[0].name}`;
         });
-      setTimeout(() => {
-        console.log(cookies);
-      }, 1000);
       let tableRef = document.getElementById("userTable").getElementsByTagName("tbody")[0];
-      let productArea = document.getElementById("product-area");
+      let productArea1 = document.getElementById("product-area-1");
+      let productArea2 = document.getElementById("product-area-2");
+      let productArea3 = document.getElementById("product-area-3");
+      let productArea4 = document.getElementById("product-area-4");
+      let productArea5 = document.getElementById("product-area-5");
+      let department1 = document.getElementById("department-1");
+      let department2 = document.getElementById("department-2");
+      let department3 = document.getElementById("department-3");
+      let department4 = document.getElementById("department-4");
+      let department5 = document.getElementById("department-5");
       let ul = document.querySelector("ul");
       let categoryInput = document.getElementById("input-category");
       const msgDiv = document.querySelector("#msg-product");
@@ -186,73 +245,107 @@
         readAccInfo();
       });
       function readAccInfo() {
-        const infoPath =
-          process.env.NODE_ENV === "development"
-            ? "./data/info.csv"
-            : path.join(process.resourcesPath, "data/info.csv");
-        fs.readFile(infoPath, function (err, data) {
-          if (err) {
-            throw err;
-          }
-          parse(data, { columns: false, trim: true }, function (err, rows) {
-            tableRef.innerHTML = "";
-            for (let index = 1; index < rows.length; index++) {
-              const elements = rows[index];
-              var dataJson = JSON.stringify(elements);
-              var str = "<th scope='row'>" + index.toString() + "</th>";
-              elements.forEach((element, index) => {
-                if (index == 1 || index == 4) {
-                  str += "<td class='hidetext'>" + element + "</td>";
-                } else {
-                  str += "<td>" + element + "</td>";
-                }
-              });
-              str +=
-                `<td><button class='btn btn-primary btn-xs my-xs-btn' type='button' onClick='selectFunc(` +
-                dataJson +
-                `)' >` +
-                "<span class='glyphicon glyphicon-pencil'></span> Upload </button>";
-              str +=
-                `<button style='margin-left:10px;' class='btn btn-primary btn-xs my-xs-btn' type='button' onClick='openFunc(` +
-                dataJson +
-                `)' >` +
-                "<span class='glyphicon glyphicon-pencil'></span> Open </button></td>";
-              tableRef.insertRow().innerHTML = str;
+        try {
+          const infoPath =
+            process.env.NODE_ENV === "development"
+              ? "./data/info.csv"
+              : path.join(process.resourcesPath, "data/info.csv");
+          fs.readFile(infoPath, "utf8", function (err, data) {
+            if (err) {
+              log.error(err);
+              throw err;
             }
+            parse(data, { columns: false, trim: true }, function (err, rows) {
+              if (err) {
+                log.error(err);
+                throw err;
+              }
+              tableRef.innerHTML = "";
+              for (let index = 0; index < rows.length; index++) {
+                const elements = rows[index];
+                var dataJson = JSON.stringify(elements);
+                var str = "<th scope='row'>" + index.toString() + "</th>";
+                elements.forEach((element, index) => {
+                  if (index == 1 || index == 4) {
+                    //str += "<td class='hidetext'>" + element + "</td>";
+                  } else {
+                    str += "<td>" + element + "</td>";
+                  }
+                });
+                str +=
+                  `<td><button class='btn btn-primary btn-xs my-xs-btn' type='button' onClick='selectFunc(` +
+                  dataJson +
+                  `)' >` +
+                  "<span class='glyphicon glyphicon-pencil'></span> Upload </button>";
+                str +=
+                  `<button style='margin-left:10px;' class='btn btn-primary btn-xs my-xs-btn' type='button' onClick='openFunc(` +
+                  dataJson +
+                  `)' >` +
+                  "<span class='glyphicon glyphicon-pencil'></span> Open </button></td>";
+                tableRef.insertRow().innerHTML = str;
+              }
+            });
           });
-        });
+        } catch (err) {
+          log.error(err);
+          return;
+        }
       }
       readAccInfo();
+      //read product
       const productPath =
         process.env.NODE_ENV === "development"
           ? "./data/product.csv"
           : path.join(process.resourcesPath, "data/product.csv");
-      fs.readFile(productPath, function (err, data) {
+      fs.readFile(productPath, "utf8", function (err, data) {
         if (err) {
+          log.error(err);
           throw err;
         }
-        parse(data, { columns: false, trim: true }, function (err, rows) {
-          const elements = rows[0];
-          elements.forEach((element) => {
-            productArea.value += element + "\n";
-          });
-        });
-      });
-      fs.readFile(categoryPath, function (err, data) {
-        if (err) {
-          throw err;
-        }
-        parse(data, { columns: false, trim: true }, function (err, rows) {
-          const elements = rows[0];
-          elements.forEach((element, index) => {
-            if (index == elements.length - 1) {
-              categoryInput.value += element;
-            } else {
-              categoryInput.value += element + ",";
+        parse(data, { relax_column_count: true, trim: true }, function (err, rows) {
+          if (err) {
+            log.error(err);
+            throw err;
+          }
+          if (rows.length > 0) {
+            for (let i = 0; i < rows.length; i++) {
+              const elements = rows[i];
+              elements.forEach((element, index) => {
+                if (index == 0) {
+                  eval("department" + (i + 1)).value = element;
+                } else {
+                  eval("productArea" + (i + 1)).value += element + "\n";
+                }
+              });
             }
-          });
+          }
         });
       });
+
+      //read category
+      fs.readFile(categoryPath, "utf8", function (err, data) {
+        if (err) {
+          log.error(err);
+          throw err;
+        }
+        parse(data, { columns: false, trim: true }, function (err, rows) {
+          if (err) {
+            log.error(err);
+            throw err;
+          }
+          if (rows.length > 0) {
+            const elements = rows[0];
+            elements.forEach((element, index) => {
+              if (index == elements.length - 1) {
+                categoryInput.value += element;
+              } else {
+                categoryInput.value += element + ",";
+              }
+            });
+          }
+        });
+      });
+
       function openTab(evt, tabName) {
         var i, tabcontent, tablinks;
         tabcontent = document.getElementsByClassName("tabcontent");
@@ -266,33 +359,40 @@
         document.getElementById(tabName).style.display = "block";
         evt.currentTarget.className += " active";
       }
+
       function selectFunc(arrayData) {
         if (arrayData[0] == "" || arrayData[1] == "") {
           const errMsgBox = dialog.showErrorBox("Username or password incorrect !!!", "");
         }
         ipcRenderer.send("select-clicked", arrayData);
       }
+
       function saveProductFunc() {
+        const dialog = remote.dialog;
+        for (let i = 1; i <= 5; i++) {
+          if (eval("productArea" + i).value != "") {
+            if (eval("department" + i).value == "") {
+              const errMsgBox = dialog.showErrorBox(`Department ${i} can not be empty !!!`, "");
+            }
+          }
+        }
         let columns = {
           product: "Product",
         };
-        let textSplit = productArea.value
-          .split("\n")
-          .filter((v) => {
-            return v != "";
-          })
-          .map((v) => {
-            return v.trim();
-          });
-        let data = [];
-        data.push(textSplit);
-        stringify(data, function (err, output) {
-          const product2Path =
-            process.env.NODE_ENV === "development"
-              ? "./data/product.csv"
-              : path.join(process.resourcesPath, "data/product.csv");
-          fs.writeFile(product2Path, output, function (err) {
+        let data1 = stringHandle(productArea1.value, department1.value);
+        let data2 = stringHandle(productArea2.value, department2.value);
+        let data3 = stringHandle(productArea3.value, department3.value);
+        let data4 = stringHandle(productArea4.value, department4.value);
+        let data5 = stringHandle(productArea5.value, department5.value);
+        let data = [...data1, ...data2, ...data3, ...data4, ...data5];
+        stringify(data, { header: false }, function (err, output) {
+          if (err) {
+            log.error(err);
+            throw err;
+          }
+          fs.writeFile(productPath, output, function (err) {
             if (err) {
+              log.error(err);
               throw err;
             }
             msgDiv.style.display = "block";
@@ -304,27 +404,24 @@
           });
         });
       }
+
       function saveCategoryFunc() {
         let columns = {
           product: "Category",
         };
-        let textSplit = categoryInput.value
-          .split(",")
-          .filter((v) => {
-            return v != "";
-          })
-          .map((v) => {
-            return v.trim();
-          });
-        let data = [];
-        data.push(textSplit);
+        let data = stringHandle(categoryInput.value, "", ",", "category");
         stringify(data, function (err, output) {
+          if (err) {
+            log.error(err);
+            throw err;
+          }
           const categoryPath =
             process.env.NODE_ENV === "development"
               ? "./data/category.csv"
               : path.join(process.resourcesPath, "data/category.csv");
           fs.writeFile(categoryPath, output, function (err) {
             if (err) {
+              log.error(err);
               throw err;
             }
             msgCate.style.display = "flex";
@@ -336,12 +433,14 @@
           });
         });
       }
+
       function importFunc() {
         ipcRenderer.send("import-clicked", "openImportWindow");
       }
       window.onscroll = function () {
         stickyHeader();
       };
+
       var navbar = document.getElementById("tab");
       var sticky = navbar.offsetTop;
       function stickyHeader() {
@@ -351,6 +450,7 @@
           navbar.classList.remove("sticky");
         }
       }
+
       function logoutFunc() {
         const { remote } = require("electron");
         const dialog = remote.dialog;
@@ -376,8 +476,28 @@
             console.log("ERROR", err);
           });
       }
+
       function openFunc(data) {
         ipcRenderer.send("open-account", data);
+      }
+
+      function stringHandle(str, department = "", splitStr = "\n", type = "") {
+        let data = [];
+        if (str.trim() != "") {
+          let textSplit = str
+            .split(splitStr)
+            .filter((v) => {
+              return v != "";
+            })
+            .map((v) => {
+              return v.trim();
+            });
+          if (type != "category") {
+            textSplit.unshift(department);
+          }
+          data.push(textSplit);
+        }
+        return data;
       }
     </script>
   </body>

@@ -17,6 +17,7 @@ const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
 const getmac = require("getmac");
 const publicIp = require("public-ip");
+const AdblockerPlugin = require("puppeteer-extra-plugin-adblocker");
 
 puppeteer.use(
   RecaptchaPlugin({
@@ -24,6 +25,7 @@ puppeteer.use(
     visualFeedback: true,
   })
 );
+puppeteer.use(AdblockerPlugin());
 puppeteer.use(StealthPlugin());
 
 let mainWindow, homeWindow, uploadWindow, importWindow, updateWindow, adminWindow, editUserWindow;
@@ -80,15 +82,10 @@ function createWindow() {
     mainWindow = null;
   });
   // Connect to MongoDB
-  if (process.env.NODE_ENV !== "development") {
-    setTimeout(() => {
-      connectDB(dbConnectionStr);
-    }, 1000);
-  } else {
-    setTimeout(() => {
-      connectDB(dbConnectionStr);
-    }, 1000);
-  }
+  setTimeout(() => {
+    connectDB(dbConnectionStr);
+  }, 1000);
+
   const ip_adds = (async () => {
     publicIPObj.ip = await publicIp.v4();
   })();
@@ -186,7 +183,7 @@ function createImportWindow() {
     height: 600,
     resizable: false,
     darkTheme: true,
-    title: "Society Upload Tool",
+    title: "Zazzle Upload Tool",
     webPreferences: {
       nodeIntegration: true,
       enableRemoteModule: true,
@@ -411,10 +408,8 @@ async function mainProcess(arrAcc, arrItems) {
     const proxyPass = arrAcc[4];
     const arrImgPath = arrItems[0];
     const imgType = arrItems[2];
-    const departmentName = arrItems[3];
+    // const departmentName = arrItems[3];
     const regexStr = /([^\\]+)(?=\.\w+$)/;
-    let isCategoryCreated = false;
-
     // Read category
     let categoryList = [];
     const categoryPath =
@@ -426,15 +421,23 @@ async function mainProcess(arrAcc, arrItems) {
         log.error(err);
       }
       parse(data, { columns: false, trim: true }, function (err, rows) {
-        let elements = rows[0];
-        elements.forEach((element) => {
-          categoryList.push(element.trim());
-        });
+        if (err) {
+          log.error(err);
+        }
+        if (rows.length != 0) {
+          let elements = rows[0];
+          elements.forEach((element) => {
+            categoryList.push(element.trim());
+          });
+        } else {
+          return;
+        }
       });
     });
 
     // Read product
     let productList = [];
+    let departmentList = [];
     const productPath =
       process.env.NODE_ENV === "development"
         ? "./data/product.csv"
@@ -443,14 +446,24 @@ async function mainProcess(arrAcc, arrItems) {
       if (err) {
         log.error(err);
       }
-      parse(data, { columns: false, trim: true }, function (err, rows) {
-        let elements = rows[0];
-        elements.forEach((element) => {
-          productList.push(element);
-        });
+      parse(data, { relax_column_count: true, trim: true }, function (err, rows) {
+        if (err) {
+          log.error(err);
+        }
+        for (let i = 0; i < rows.length; i++) {
+          const elements = rows[i];
+          let productElement = [];
+          elements.forEach((element, index) => {
+            if (index == 0) {
+              departmentList.push(element);
+            } else {
+              productElement.push(element);
+            }
+          });
+          productList.push(productElement);
+        }
       });
     });
-
     // Read tag
     let tagListArr = [];
     let arrTags = [];
@@ -523,35 +536,42 @@ async function mainProcess(arrAcc, arrItems) {
         if (err) {
           log.error(err);
         }
-        linkList = rows;
+        if (rows.length > 0) {
+          linkList = rows;
+        }
       });
     });
     setTimeout(() => {
       for (let index = 0; index < productList.length; index++) {
-        let product = {};
-        let productEle = productList[index];
-        let splitProduct = productEle.split("->").map((v) => {
-          return v.trim();
-        });
-        product.price =
-          typeof splitProduct[3] !== "undefined"
-            ? splitProduct[3]
-            : typeof splitProduct[2] !== "undefined"
-            ? splitProduct[2].includes("$")
-              ? splitProduct[2]
-              : ""
-            : "";
+        let productArrChild = [];
+        for (let i = 0; i < productList[index].length; i++) {
+          let product = {};
+          let productEle = productList[index][i];
+          let splitProduct = productEle.split("->").map((v) => {
+            return v.trim();
+          });
+          product.price =
+            typeof splitProduct[3] !== "undefined"
+              ? splitProduct[3]
+              : typeof splitProduct[2] !== "undefined"
+              ? splitProduct[2].includes("$")
+                ? splitProduct[2]
+                : ""
+              : "";
 
-        product.secondProduct = typeof splitProduct[1] !== "undefined" ? splitProduct[1] : "";
-        product.thirdProduct =
-          typeof splitProduct[2] !== "undefined" ? (splitProduct[2].includes("$") ? "" : splitProduct[2]) : "";
-        let filterProduct = linkList.find((row) => {
-          return row[1].trim() == splitProduct[0].trim();
-        })[0];
-        if (filterProduct != null && typeof filterProduct != "undefined") {
-          product.firstLink = "https://www.zazzle.com/custom/" + filterProduct;
+          product.secondProduct = typeof splitProduct[1] !== "undefined" ? splitProduct[1] : "";
+          product.thirdProduct =
+            typeof splitProduct[2] !== "undefined" ? (splitProduct[2].includes("$") ? "" : splitProduct[2]) : "";
+          let filterProduct = linkList.find((row) => {
+            return row[1].trim() == splitProduct[0].trim();
+          })[0];
+          if (filterProduct != null && typeof filterProduct != "undefined") {
+            product.firstLink = "https://www.zazzle.com/custom/" + filterProduct;
+          }
+          product.department = departmentList[index];
+          productArrChild.push(product);
         }
-        productArr.push(product);
+        productArr.push(productArrChild);
       }
     }, 1000);
 
@@ -570,7 +590,7 @@ async function mainProcess(arrAcc, arrItems) {
       waitUntil: "networkidle2",
     });
     await myFunc.timeOutFunc(1000);
-    const humanCapt = await page.evaluate(() => {
+    let humanCapt = await page.evaluate(() => {
       let pageTitle = document.querySelector(".page-title");
       let result = false;
       pageTitle != null ? (result = true) : (result = false);
@@ -623,6 +643,23 @@ async function mainProcess(arrAcc, arrItems) {
         log.error(error);
       });
     }
+    await myFunc.timeOutFunc(1000);
+    humanCapt = await page.evaluate(() => {
+      let pageTitle = document.querySelector(".page-title");
+      let result = false;
+      pageTitle != null ? (result = true) : (result = false);
+      return result;
+    });
+    if (humanCapt) {
+      console.log("resolving humanCapt");
+      await homeWindow.webContents.send("logs", "Resolving captcha...");
+      await page.solveRecaptchas();
+      await homeWindow.webContents.send("logs", "Resolved captcha");
+      console.log("resolved humanCapt");
+      await Promise.all([page.waitForNavigation()]).catch((error) => {
+        log.error(error);
+      });
+    }
     try {
       await page.waitForSelector('a[title="My Account"]', { timeout: 5000 });
       await homeWindow.webContents.send("logs", `Login success: ${accUsername}`);
@@ -636,17 +673,23 @@ async function mainProcess(arrAcc, arrItems) {
 
     // Upload images
     await page.goto("https://www.zazzle.com/lgn/signin?mlru=images");
-    await myFunc.timeOutFunc(3000);
-    let uploadBtn = await page.$(".FileInput-activeInput");
-    while (!uploadBtn) {
-      await page.reload();
-      await myFunc.timeOutFunc(3000);
-      await page.waitForSelector(".FileInput-activeInput", { timeout: 5000 }).catch((err) => {
-        log.error(err);
-        return;
-      });
-      uploadBtn = await page.$(".FileInput-activeInput");
-    }
+    await myFunc.timeOutFunc(6000);
+    await page.waitForSelector(".FileInput-activeInput", { timeout: 15000 });
+    // let uploadBtn = await page.$(".FileInput-activeInput");
+    // await page.evaluate(() => {
+    //   window.stop();
+    // });
+    // while (!uploadBtn) {
+    //   await page.reload();
+    //   await page.waitForSelector(".FileInput-activeInput", { timeout: 5000 }).catch((err) => {
+    //     log.error(err);
+    //     return;
+    //   });
+    //   await page.evaluate(() => {
+    //     window.stop();
+    //   });
+    //   uploadBtn = await page.$(".FileInput-activeInput");
+    // }
     //get image counter
     const originCounter = await page.evaluate(() => {
       return parseInt(
@@ -683,6 +726,7 @@ async function mainProcess(arrAcc, arrItems) {
         arrImgPath.length + originCounter
       )
       .catch((error) => {
+        log.error(error);
         return;
       });
     await myFunc.timeOutFunc(500);
@@ -700,341 +744,345 @@ async function mainProcess(arrAcc, arrItems) {
 
     // Add product
     for (let index = 0; index < productArr.length; index++) {
-      let linkArr = [];
-      const element = productArr[index];
-      await page.goto(element.firstLink);
-      await myFunc.timeOutFunc(500);
-      if (element.thirdProduct != "") {
-        const secondProductLink = await getSecondLink(element, page);
-        if (secondProductLink != "") {
-          await page.goto(secondProductLink);
-          await myFunc.timeOutFunc(500);
+      for (let i = 0; i < productArr[index].length; i++) {
+        let linkArr = [];
+        const element = productArr[index][i];
+        await page.goto(element.firstLink);
+        await myFunc.timeOutFunc(500);
+        if (element.thirdProduct != "") {
+          const secondProductLink = await getSecondLink(element, page);
+          if (secondProductLink != "") {
+            await page.goto(secondProductLink);
+            await myFunc.timeOutFunc(500);
+            const numberOfPage = await page.evaluate(() => {
+              return parseInt(
+                document.querySelector(".ZazzlePagination-pageDisplay").textContent.match(/(\d+)(?!.*\d)/gm)
+              );
+            });
+            //get link page 1
+            await getThirdLink(element, page, linkArr);
+            //get link other pages
+            for (let i = 2; i <= numberOfPage; i++) {
+              console.log(`Goto page ${i}`);
+              await page.goto(element.firstLink + `?pg=${i}`);
+              await getThirdLink(element, page, linkArr);
+            }
+          }
+          if (linkArr == "") {
+            log.error("Can not find product link");
+          }
+        } else {
           const numberOfPage = await page.evaluate(() => {
             return parseInt(
               document.querySelector(".ZazzlePagination-pageDisplay").textContent.match(/(\d+)(?!.*\d)/gm)
             );
           });
           //get link page 1
-          await getThirdLink(element, page, linkArr);
+          await getLink(element, page, linkArr);
           //get link other pages
           for (let i = 2; i <= numberOfPage; i++) {
             console.log(`Goto page ${i}`);
             await page.goto(element.firstLink + `?pg=${i}`);
-            await getThirdLink(element, page, linkArr);
+            await getLink(element, page, linkArr);
+          }
+          if (linkArr == "") {
+            log.error("Can not find product link");
           }
         }
-        if (linkArr == "") {
-          throw new Error("Can not find product link");
-        }
-      } else {
-        const numberOfPage = await page.evaluate(() => {
-          return parseInt(document.querySelector(".ZazzlePagination-pageDisplay").textContent.match(/(\d+)(?!.*\d)/gm));
-        });
-        //get link page 1
-        await getLink(element, page, linkArr);
-        //get link other pages
-        for (let i = 2; i <= numberOfPage; i++) {
-          console.log(`Goto page ${i}`);
-          await page.goto(element.firstLink + `?pg=${i}`);
-          await getLink(element, page, linkArr);
-        }
-        if (linkArr == "") {
-          throw new Error("Can not find product link");
-        }
-      }
-      for (let i = 0; i < linkArr.length; i++) {
-        for (let j = 0; j < arrImgPath.length; j++) {
-          let imgPath = arrImgPath[j];
-          let imgName = imgPath.replace(/^.*[\\\/]/, "");
-          let imgDirname = path.dirname(imgPath);
-          let imgNameInChars = imgPath
-            .match(regexStr)[0]
-            .replace(/-/g, " ")
-            .replace(/[^a-zA-Z ]/g, "")
-            .trim();
-          let imgNameInCharsSplit = imgNameInChars.split(" ");
-          imgNameInCharsSplit.forEach((element) => {
-            if (tagListArr != "") {
-              tagListArr.splice(0, 0, element);
-            } else {
-              tagListArr.push(element);
+        for (let i = 0; i < linkArr.length; i++) {
+          for (let j = 0; j < arrImgPath.length; j++) {
+            let imgPath = arrImgPath[j];
+            let imgName = imgPath.replace(/^.*[\\\/]/, "");
+            let imgDirname = path.dirname(imgPath);
+            let imgNameInChars = imgPath
+              .match(regexStr)[0]
+              .replace(/-/g, " ")
+              .replace(/[^a-zA-Z ]/g, "")
+              .trim();
+            let imgNameInCharsSplit = imgNameInChars.split(" ");
+            imgNameInCharsSplit.forEach((element) => {
+              if (tagListArr != "") {
+                tagListArr.splice(0, 0, element);
+              } else {
+                tagListArr.push(element);
+              }
+            });
+            let desciptionStr = "";
+            for (let k = 0; k < tagListArr.length; k++) {
+              desciptionStr += `${tagListArr[k]} `;
             }
-          });
-          let desciptionStr = "";
-          for (let k = 0; k < tagListArr.length; k++) {
-            desciptionStr += `${tagListArr[k]} `;
-          }
 
-          await page.goto(linkArr[i], {
-            waitUntil: "networkidle2",
-          });
-          //Click Add Image
-          await myFunc.timeOutFunc(3000);
-          const soldOutErr = await page.$(".ErrorList");
-          if (soldOutErr != null) {
-            await homeWindow.webContents.send("logs", `${linkArr[i]} is sold out`);
-            continue;
-          }
-          // await page.waitForSelector(".DesignPod-customizeControls", { timeout: 10000 });
-          let addImgBtn = await page.$(".DesignPod-customizeControls");
-          while (!addImgBtn) {
-            await page.reload();
-            await myFunc.timeOutFunc(5000);
-            addImgBtn = await page.$(".DesignPod-customizeControls");
-          }
-
-          await page.$eval(".DesignPod-customizeControls", (ele) => {
-            ele.firstElementChild.click();
-          });
-          await myFunc.timeOutFunc(1000);
-          try {
-            await page.waitForSelector(".Z4DSContentPanelBase-bigBlueButton", { timeout: 10000 });
-          } catch (err) {
-            await page.reload({ waitUntil: ["networkidle0", "domcontentloaded"] });
+            await page.goto(linkArr[i], {
+              waitUntil: "networkidle2",
+            });
             //Click Add Image
             await myFunc.timeOutFunc(3000);
-            let addImageSelector = ".DesignPod-customizeControls";
-            await page.waitForSelector(addImageSelector);
-            await page.$eval(addImageSelector, (ele) => {
+            const soldOutErr = await page.$(".ErrorList");
+            if (soldOutErr != null) {
+              await homeWindow.webContents.send("logs", `${linkArr[i]} is sold out`);
+              continue;
+            }
+            await page.waitForSelector(".DesignPod-customizeControls", { timeout: 10000 });
+            // let addImgBtn = await page.$(".DesignPod-customizeControls");
+            // while (!addImgBtn) {
+            //   await page.reload();
+            //   await myFunc.timeOutFunc(5000);
+            //   addImgBtn = await page.$(".DesignPod-customizeControls");
+            // }
+
+            await page.$eval(".DesignPod-customizeControls", (ele) => {
               ele.firstElementChild.click();
             });
-            await page.waitForSelector(".Z4DSContentPanelBase-bigBlueButton", { timeout: 0 });
-            continue;
-          }
-          //Click Open full image browser
-          await myFunc.timeOutFunc(500);
-          await page.click(".Z4DSContentPanelBase-bigBlueButton");
-          //Choose image
-          await myFunc.timeOutFunc(1000);
-          await page.waitForSelector(`img.JustifiedGridItem-image[alt="${imgName}"]`);
-          await page.click(`img.JustifiedGridItem-image[alt="${imgName}"]`);
-          await myFunc.timeOutFunc(3000);
-          let dialogSize = await page.evaluate(() => {
-            const dialogBody = document.querySelector(".Dialog-body");
-            let result = false;
-            if (dialogBody != null) {
-              //Select size dialog
-              let dialogOption = [...document.querySelector(".Dialog-body>div>div>fieldset>div").children];
-              for (let i = 0; i < dialogOption.length; i++) {
-                if (dialogOption[i].textContent.includes("Use my image to resize to the nearest")) {
-                  dialogOption[i].children[0].click();
-                  result = true;
-                  break;
-                }
-              }
-            } else {
-              result = false;
+            await myFunc.timeOutFunc(1000);
+            try {
+              await page.waitForSelector(".Z4DSContentPanelBase-bigBlueButton", { timeout: 10000 });
+            } catch (err) {
+              await page.reload({ waitUntil: ["networkidle0", "domcontentloaded"] });
+              //Click Add Image
+              await myFunc.timeOutFunc(3000);
+              let addImageSelector = ".DesignPod-customizeControls";
+              await page.waitForSelector(addImageSelector);
+              await page.$eval(addImageSelector, (ele) => {
+                ele.firstElementChild.click();
+              });
+              await page.waitForSelector(".Z4DSContentPanelBase-bigBlueButton", { timeout: 0 });
+              continue;
             }
-            if (result) {
-              setTimeout(() => {
-                let continueBtn = document.querySelector(".Dialog-buttonBar");
-                continueBtn.firstElementChild.click();
-              }, 1000);
-            }
-            //Click button continue after select size if size dialog exist
-          });
-
-          await myFunc.timeOutFunc(500);
-          await page.waitForSelector(".Z4DSPropertiesPanelBase-duplexRow");
-          await myFunc.timeOutFunc(500);
-          await page.evaluate((imgType) => {
-            //Choose image type: Fill or Fit
-            const fillFitButton = document.querySelector(".Z4DSPropertiesPanelBase-duplexRow");
-            if (fillFitButton.children[0].children[1].textContent == imgType) {
-              fillFitButton.children[0].click();
-            } else {
-              fillFitButton.children[1].click();
-            }
-            return true;
-          }, imgType);
-          await myFunc.timeOutFunc(500);
-          // Click button Done
-          await page.waitForSelector(".Z4ColorButton--blue");
-          await page.click(".Z4ColorButton--blue");
-          await myFunc.timeOutFunc(1000);
-          await page.waitForSelector("button.Button_root__HighVisibility");
-          await Promise.all([
-            // Click Sell It
-            page.click("button.Button_root__HighVisibility"),
-            page.waitForNavigation(),
-          ]).catch((error) => {
-            log.error(error);
-          });
-          // Type title
-          await page.waitForSelector("#page_postForSaleForm_elements_productTitle-input");
-          await page.type("#page_postForSaleForm_elements_productTitle-input", imgNameInChars);
-          // choose Marketplace Department
-          let fillDep = await page.evaluate((departmentName) => {
-            const suggestedDepartment = document.querySelectorAll(
-              '[id^="page_postForSaleForm_elements_department_suggestedDepartments_value"].ZazzleSelectorValueDisplay-displayName'
-            );
-            let result = false;
-            for (let k = 0; k < suggestedDepartment.length; k++) {
-              if (suggestedDepartment[k].textContent == departmentName) {
-                suggestedDepartment[k].click();
-                result = true;
-                break;
-              }
-            }
-            return result;
-          }, departmentName);
-          await page.click("#page_postForSaleForm_elements_productDescription-input");
-          await myFunc.timeOutFunc(4000);
-          // await page.waitForSelector("#page_confirmDialog", { timeout: 5000 });
-          await page.evaluate(() => {
-            const confirmDialog = document.querySelector("#page_confirmDialog");
-            if (confirmDialog != null) {
-              document.querySelector("#page_confirmDialog_cancel").click();
-            }
-          });
-
-          if (!fillDep) {
-            homeWindow.webContents.send("logs", `Can not find department to choose`);
-          }
-          // fill desciption
-          await page.type("#page_postForSaleForm_elements_productDescription-input", desciptionStr);
-          await myFunc.timeOutFunc(500);
-          //select Store Category
-          await page.waitForSelector("#page_postForSaleForm_elements_cnProductLine-folderPath");
-          let isValidCategory = await page.evaluate((categoryList) => {
-            let categoryName = document.querySelector("#page_postForSaleForm_elements_cnProductLine-folderPath");
-            let result = false;
-            //check exist category
-            categoryName.textContent.trim() == categoryList[0] + " > " + categoryList[1]
-              ? (result = true)
-              : (result = false);
-            return result;
-          }, categoryList);
-          await myFunc.timeOutFunc(2000);
-          if (!isValidCategory) {
-            // await myFunc.timeOutFunc(1000);
-            //open select category dialog
-            await page.waitForSelector("#page_postForSaleForm_elements_cnProductLine-selectCategory");
-            await page.click("#page_postForSaleForm_elements_cnProductLine-selectCategory");
-            await page.waitForSelector(".ZazzleCollectionItemFolderNavigationPane-links");
-            //check first category
-            let is2ndCategoryExists = false;
-            let is1stCategoryExists = await page.evaluate((categoryList) => {
+            //Click Open full image browser
+            await myFunc.timeOutFunc(500);
+            await page.click(".Z4DSContentPanelBase-bigBlueButton");
+            //Choose image
+            await myFunc.timeOutFunc(1000);
+            await page.waitForSelector(`img.JustifiedGridItem-image[alt="${imgName}"]`);
+            await page.click(`img.JustifiedGridItem-image[alt="${imgName}"]`);
+            await myFunc.timeOutFunc(5000);
+            let dialogSize = await page.evaluate(() => {
+              const dialogBody = document.querySelector(".Dialog-body");
               let result = false;
-              //Get all categories from 1st section (left)
-              let leftCategorySection = [
-                ...document.querySelectorAll('a[id^="page_categoryBrowserDialog_navigationPanes_item0_zWidget0_"]'),
-              ];
-              for (let k = 0; k < leftCategorySection.length; k++) {
-                if (leftCategorySection[k].textContent.trim() == categoryList[0]) {
-                  leftCategorySection[k].click();
+              if (dialogBody != null) {
+                //Select size dialog
+                let dialogOption = [...document.querySelector(".Dialog-body>div>div>fieldset>div").children];
+                for (let i = 0; i < dialogOption.length; i++) {
+                  if (dialogOption[i].textContent.includes("Use my image to resize to the nearest")) {
+                    dialogOption[i].children[0].click();
+                    result = true;
+                    break;
+                  }
+                }
+              } else {
+                result = false;
+              }
+              if (result) {
+                setTimeout(() => {
+                  let continueBtn = document.querySelector(".Dialog-buttonBar");
+                  continueBtn.firstElementChild.click();
+                }, 1000);
+              }
+              //Click button continue after select size if size dialog exist
+            });
+
+            await myFunc.timeOutFunc(500);
+            await page.waitForSelector(".Z4DSPropertiesPanelBase-duplexRow");
+            await myFunc.timeOutFunc(500);
+            await page.evaluate((imgType) => {
+              //Choose image type: Fill or Fit
+              const fillFitButton = document.querySelector(".Z4DSPropertiesPanelBase-duplexRow");
+              if (fillFitButton.children[0].children[1].textContent == imgType) {
+                fillFitButton.children[0].click();
+              } else {
+                fillFitButton.children[1].click();
+              }
+              return true;
+            }, imgType);
+            await myFunc.timeOutFunc(500);
+            // Click button Done
+            await page.waitForSelector(".Z4ColorButton--blue");
+            await page.click(".Z4ColorButton--blue");
+            await myFunc.timeOutFunc(1000);
+            await page.waitForSelector("button.Button_root__HighVisibility");
+            await Promise.all([
+              // Click Sell It
+              page.click("button.Button_root__HighVisibility"),
+              page.waitForNavigation(),
+            ]).catch((error) => {
+              log.error(error);
+            });
+            // Type title
+            await page.waitForSelector("#page_postForSaleForm_elements_productTitle-input");
+            await page.type("#page_postForSaleForm_elements_productTitle-input", imgNameInChars);
+            // choose Marketplace Department
+            let fillDep = await page.evaluate((departmentName) => {
+              const suggestedDepartment = document.querySelectorAll(
+                '[id^="page_postForSaleForm_elements_department_suggestedDepartments_value"].ZazzleSelectorValueDisplay-displayName'
+              );
+              let result = false;
+              for (let k = 0; k < suggestedDepartment.length; k++) {
+                if (suggestedDepartment[k].textContent == departmentName) {
+                  suggestedDepartment[k].click();
                   result = true;
                   break;
                 }
               }
               return result;
-            }, categoryList);
+            }, element.department);
+            await page.click("#page_postForSaleForm_elements_productDescription-input");
+            await myFunc.timeOutFunc(4000);
+            // await page.waitForSelector("#page_confirmDialog", { timeout: 5000 });
+            await page.evaluate(() => {
+              const confirmDialog = document.querySelector("#page_confirmDialog");
+              if (confirmDialog != null) {
+                document.querySelector("#page_confirmDialog_cancel").click();
+              }
+            });
 
+            if (!fillDep) {
+              homeWindow.webContents.send("logs", `Can not find department to choose`);
+            }
+            // fill desciption
+            await page.type("#page_postForSaleForm_elements_productDescription-input", desciptionStr);
+            await myFunc.timeOutFunc(500);
+            //select Store Category
+            await page.waitForSelector("#page_postForSaleForm_elements_cnProductLine-folderPath");
+            let isValidCategory = await page.evaluate((categoryList) => {
+              let categoryName = document.querySelector("#page_postForSaleForm_elements_cnProductLine-folderPath");
+              let result = false;
+              //check exist category
+              categoryName.textContent.trim() == categoryList[0] + " > " + categoryList[1]
+                ? (result = true)
+                : (result = false);
+              return result;
+            }, categoryList);
             await myFunc.timeOutFunc(2000);
-            if (is1stCategoryExists) {
-              is2ndCategoryExists = await page.evaluate((categoryList) => {
+            if (!isValidCategory) {
+              // await myFunc.timeOutFunc(1000);
+              //open select category dialog
+              await page.waitForSelector("#page_postForSaleForm_elements_cnProductLine-selectCategory");
+              await page.click("#page_postForSaleForm_elements_cnProductLine-selectCategory");
+              await page.waitForSelector(".ZazzleCollectionItemFolderNavigationPane-links");
+              //check first category
+              let is2ndCategoryExists = false;
+              let is1stCategoryExists = await page.evaluate((categoryList) => {
                 let result = false;
-                //Get all categories from 2nd section (right)
-                let rightCategorySection = [
-                  ...document.querySelectorAll('a[id^="page_categoryBrowserDialog_navigationPanes_item1_zWidget0_"]'),
+                //Get all categories from 1st section (left)
+                let leftCategorySection = [
+                  ...document.querySelectorAll('a[id^="page_categoryBrowserDialog_navigationPanes_item0_zWidget0_"]'),
                 ];
-                for (let k = 0; k < rightCategorySection.length; k++) {
-                  if (rightCategorySection[k].textContent.trim() == categoryList[1]) {
-                    rightCategorySection[k].click();
+                for (let k = 0; k < leftCategorySection.length; k++) {
+                  if (leftCategorySection[k].textContent.trim() == categoryList[0]) {
+                    leftCategorySection[k].click();
                     result = true;
                     break;
                   }
                 }
                 return result;
               }, categoryList);
-            }
-            await myFunc.timeOutFunc(500);
-            //click Done
-            await page.waitForSelector("#page_categoryBrowserDialog_ok");
-            await page.click("#page_categoryBrowserDialog_ok");
 
-            await myFunc.timeOutFunc(2000);
-            if (is1stCategoryExists == false || (is1stCategoryExists == true && is2ndCategoryExists == false)) {
-              const btnClearNewSelector = "#page_postForSaleForm_elements_cnProductLine-clearCategory";
-              let btnClear = await page.$(btnClearNewSelector);
-              //Click Clear
-              await btnClear.click();
-              await myFunc.timeOutFunc(1000);
-              //Click New
-              let btnNew = await page.$(btnClearNewSelector);
-              await btnNew.click();
-              await myFunc.timeOutFunc(1000);
+              await myFunc.timeOutFunc(2000);
               if (is1stCategoryExists) {
-                await select1stCategory(page, categoryList);
-              } else {
-                debugger;
-                await myFunc.timeOutFunc(500);
-                await page.waitForSelector("#page_newProductLine_form_elements_name-input");
-                await page.type("#page_newProductLine_form_elements_name-input", categoryList[0]);
-                await myFunc.timeOutFunc(500);
-                //Click Add New Product Line
-                await page.click("#page_newProductLine_ok-text");
-                await myFunc.timeOutFunc(1000);
+                is2ndCategoryExists = await page.evaluate((categoryList) => {
+                  let result = false;
+                  //Get all categories from 2nd section (right)
+                  let rightCategorySection = [
+                    ...document.querySelectorAll('a[id^="page_categoryBrowserDialog_navigationPanes_item1_zWidget0_"]'),
+                  ];
+                  for (let k = 0; k < rightCategorySection.length; k++) {
+                    if (rightCategorySection[k].textContent.trim() == categoryList[1]) {
+                      rightCategorySection[k].click();
+                      result = true;
+                      break;
+                    }
+                  }
+                  return result;
+                }, categoryList);
+              }
+              await myFunc.timeOutFunc(500);
+              //click Done
+              await page.waitForSelector("#page_categoryBrowserDialog_ok");
+              await page.click("#page_categoryBrowserDialog_ok");
+
+              await myFunc.timeOutFunc(2000);
+              if (is1stCategoryExists == false || (is1stCategoryExists == true && is2ndCategoryExists == false)) {
+                const btnClearNewSelector = "#page_postForSaleForm_elements_cnProductLine-clearCategory";
+                let btnClear = await page.$(btnClearNewSelector);
                 //Click Clear
-                btnClear = await page.$(btnClearNewSelector);
                 await btnClear.click();
                 await myFunc.timeOutFunc(1000);
                 //Click New
-                btnNew = await page.$(btnClearNewSelector);
+                let btnNew = await page.$(btnClearNewSelector);
                 await btnNew.click();
                 await myFunc.timeOutFunc(1000);
-                await select1stCategory(page, categoryList);
+                if (is1stCategoryExists) {
+                  await select1stCategory(page, categoryList);
+                } else {
+                  debugger;
+                  await myFunc.timeOutFunc(500);
+                  await page.waitForSelector("#page_newProductLine_form_elements_name-input");
+                  await page.type("#page_newProductLine_form_elements_name-input", categoryList[0]);
+                  await myFunc.timeOutFunc(500);
+                  //Click Add New Product Line
+                  await page.click("#page_newProductLine_ok-text");
+                  await myFunc.timeOutFunc(1000);
+                  //Click Clear
+                  btnClear = await page.$(btnClearNewSelector);
+                  await btnClear.click();
+                  await myFunc.timeOutFunc(1000);
+                  //Click New
+                  btnNew = await page.$(btnClearNewSelector);
+                  await btnNew.click();
+                  await myFunc.timeOutFunc(1000);
+                  await select1stCategory(page, categoryList);
+                }
               }
             }
-          }
 
-          await myFunc.timeOutFunc(1000);
-          // Input tags (max 10 tags)
-          const tagsSelector = "#page_postForSaleForm_elements_tagging_input-input";
-          await page.waitForSelector(tagsSelector);
-          if (tagListArr.length >= 10) {
-            for (let i = 0; i < 10; i++) {
-              if (i == 9) {
-                await page.type(tagsSelector, tagListArr[i]);
-              } else {
-                await page.type(tagsSelector, `${tagListArr[i]} `);
+            await myFunc.timeOutFunc(1000);
+            // Input tags (max 10 tags)
+            const tagsSelector = "#page_postForSaleForm_elements_tagging_input-input";
+            await page.waitForSelector(tagsSelector);
+            if (tagListArr.length >= 10) {
+              for (let i = 0; i < 10; i++) {
+                if (i == 9) {
+                  await page.type(tagsSelector, tagListArr[i]);
+                } else {
+                  await page.type(tagsSelector, `${tagListArr[i]} `);
+                }
+              }
+            } else if (tagListArr.length > 0) {
+              for (let i = 0; i < tagListArr.length; i++) {
+                if (i == tagListArr.length - 1) {
+                  await page.type(tagsSelector, tagListArr[i]);
+                } else {
+                  await page.type(tagsSelector, `${tagListArr[i]} `);
+                }
               }
             }
-          } else if (tagListArr.length > 0) {
-            for (let i = 0; i < tagListArr.length; i++) {
-              if (i == tagListArr.length - 1) {
-                await page.type(tagsSelector, tagListArr[i]);
-              } else {
-                await page.type(tagsSelector, `${tagListArr[i]} `);
-              }
-            }
+            await myFunc.timeOutFunc(500);
+            //Click Add Tag(s)
+            await page.click("#page_postForSaleForm_elements_tagging_add");
+            await myFunc.timeOutFunc(500);
+            //Click Suitable Audience (PG-13)
+            await page.click("#page_postForSaleForm_elements_maturity_value_option1-inputImage");
+            await myFunc.timeOutFunc(500);
+            //Click User Agreement
+            await page.click("#page_postForSaleForm_elements_acceptTerms_valueDisplay-inputImage");
+            await myFunc.timeOutFunc(500);
+            //Click Post it!
+            // await myFunc.timeOutFunc(500);
+            // await page.evaluate(() => {
+            //   const page_24HourNoticeDialog = document.querySelector("#page_24HourNoticeDialog");
+            //   if (page_24HourNoticeDialog != null) {
+            //     document.querySelector("#page_24HourNoticeDialog_checkbox_valueDisplay-inputImage").click();
+            //     document.querySelector("#page_24HourNoticeDialog_ok").click();
+            //   }
+            // });
+            await Promise.all([page.click("#page_postForSaleForm_submit"), page.waitForNavigation()]).catch((error) => {
+              log.error(error);
+            });
+            imgNameInCharsSplit.forEach((element) => {
+              tagListArr.splice(0, 1);
+            });
+            await homeWindow.webContents.send("logs", `Product Published !!!`);
           }
-          await myFunc.timeOutFunc(500);
-          //Click Add Tag(s)
-          await page.click("#page_postForSaleForm_elements_tagging_add");
-          await myFunc.timeOutFunc(500);
-          //Click Suitable Audience (PG-13)
-          await page.click("#page_postForSaleForm_elements_maturity_value_option1-inputImage");
-          await myFunc.timeOutFunc(500);
-          //Click User Agreement
-          await page.click("#page_postForSaleForm_elements_acceptTerms_valueDisplay-inputImage");
-          await myFunc.timeOutFunc(500);
-          //Click Post it!
-          // await myFunc.timeOutFunc(500);
-          // await page.evaluate(() => {
-          //   const page_24HourNoticeDialog = document.querySelector("#page_24HourNoticeDialog");
-          //   if (page_24HourNoticeDialog != null) {
-          //     document.querySelector("#page_24HourNoticeDialog_checkbox_valueDisplay-inputImage").click();
-          //     document.querySelector("#page_24HourNoticeDialog_ok").click();
-          //   }
-          // });
-          await Promise.all([page.click("#page_postForSaleForm_submit"), page.waitForNavigation()]).catch((error) => {
-            log.error(error);
-          });
-          imgNameInCharsSplit.forEach((element) => {
-            tagListArr.splice(0, 1);
-          });
-          await homeWindow.webContents.send("logs", `Product Published !!!`);
         }
       }
     }
@@ -1050,6 +1098,7 @@ async function mainProcess(arrAcc, arrItems) {
         sound: true,
       },
       function (err, response) {
+        if (err) log.error(err);
         // Response is response from notification
         //console.log("responded...");
       }

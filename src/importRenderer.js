@@ -5,17 +5,18 @@ const { ipcRenderer } = require("electron");
 const parseSync = require("csv-parse/lib/sync");
 const path = require("path");
 const fs = require("fs");
+const log = require("electron-log");
 
 const infoPath =
   process.env.NODE_ENV === "development" ? "./data/info.csv" : path.join(process.resourcesPath, "data/info.csv");
 let userArrJSON = fs.readFileSync(infoPath, "utf8");
 let userAcc = parseSync(userArrJSON, {
-  columns: true,
+  columns: false,
   skip_empty_lines: true,
 });
 let userArr = [];
 userAcc.forEach((v) => {
-  userArr.push(v.Account);
+  userArr.push(v[0]);
 });
 const btnImport = document.getElementById("btnImport");
 btnImport.addEventListener("click", function (e) {
@@ -31,7 +32,9 @@ btnImport.addEventListener("click", function (e) {
       proxyusername: "ProxyUsername",
       proxypassword: "ProxyPassword",
     };
-    let textSplit = inpTextArea.split("\n");
+    let textSplit = inpTextArea.split("\n").filter((v) => {
+      return v.trim() != "";
+    });
     let data = [];
     for (let index = 0; index < textSplit.length; index++) {
       const row = textSplit[index].split("	");

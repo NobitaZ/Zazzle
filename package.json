@@ -1,6 +1,6 @@
 {
   "name": "zazzle-upload-tool",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "",
   "main": "main.js",
   "build": {
@@ -11,7 +11,7 @@
         "github"
       ],
       "target": "nsis",
-      "icon": "icon.png"
+      "icon": "icon.jpg"
     },
     "extraResources": [
       {
@@ -43,6 +43,7 @@
     "bcryptjs": "^2.4.3",
     "csv-parse": "^4.12.0",
     "csv-stringify": "^5.5.1",
+    "dotenv": "^8.2.0",
     "electron-log": "^4.2.4",
     "electron-updater": "^4.3.5",
     "getmac": "^5.16.0",
@@ -52,8 +53,8 @@
     "public-ip": "^4.0.2",
     "puppeteer": "^5.3.1",
     "puppeteer-extra": "^3.1.15",
+    "puppeteer-extra-plugin-adblocker": "^2.11.9",
     "puppeteer-extra-plugin-recaptcha": "^3.1.18",
-    "puppeteer-extra-plugin-stealth": "^2.6.2",
-    "dotenv": "^8.2.0"
+    "puppeteer-extra-plugin-stealth": "^2.6.2"
   }
 }
