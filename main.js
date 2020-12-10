@@ -673,7 +673,7 @@ async function mainProcess(arrAcc, arrItems) {
 
     // Upload images
     await page.goto("https://www.zazzle.com/lgn/signin?mlru=images");
-    await myFunc.timeOutFunc(3000);
+    await myFunc.timeOutFunc(6000);
     await page.waitForSelector(".FileInput-activeInput", { timeout: 15000 });
     // let uploadBtn = await page.$(".FileInput-activeInput");
     // await page.evaluate(() => {
@@ -727,6 +727,7 @@ async function mainProcess(arrAcc, arrItems) {
       )
       .catch((error) => {
         log.error(error);
+        return;
       });
     await myFunc.timeOutFunc(500);
     if (!imgUploadDone) {
@@ -1055,18 +1056,18 @@ async function mainProcess(arrAcc, arrItems) {
                 }
               }
             }
-            await myFunc.timeOutFunc(1000);
+            await myFunc.timeOutFunc(500);
             //Click Add Tag(s)
             await page.click("#page_postForSaleForm_elements_tagging_add");
-            await myFunc.timeOutFunc(1000);
+            await myFunc.timeOutFunc(500);
             //Click Suitable Audience (PG-13)
             await page.click("#page_postForSaleForm_elements_maturity_value_option1-inputImage");
-            await myFunc.timeOutFunc(1000);
+            await myFunc.timeOutFunc(500);
             //Click User Agreement
             await page.click("#page_postForSaleForm_elements_acceptTerms_valueDisplay-inputImage");
-            await myFunc.timeOutFunc(1000);
+            await myFunc.timeOutFunc(500);
             //Click Post it!
-            await myFunc.timeOutFunc(1500);
+            // await myFunc.timeOutFunc(500);
             // await page.evaluate(() => {
             //   const page_24HourNoticeDialog = document.querySelector("#page_24HourNoticeDialog");
             //   if (page_24HourNoticeDialog != null) {
