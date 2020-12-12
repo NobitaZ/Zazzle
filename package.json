@@ -1,6 +1,6 @@
 {
   "name": "zazzle-upload-tool",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "",
   "main": "main.js",
   "build": {
@@ -55,6 +55,7 @@
     "puppeteer-extra": "^3.1.15",
     "puppeteer-extra-plugin-adblocker": "^2.11.9",
     "puppeteer-extra-plugin-recaptcha": "^3.1.18",
-    "puppeteer-extra-plugin-stealth": "^2.6.2"
+    "puppeteer-extra-plugin-stealth": "^2.6.2",
+    "winston": "^3.3.3"
   }
 }

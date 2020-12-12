@@ -40,7 +40,7 @@
 
       /* Style the tab content */
       .tabcontent {
-        width: 99.6%;
+        width: 100%;
         display: none;
         padding: 6px 12px;
         border: 1px solid #ccc;
@@ -83,6 +83,18 @@
         margin-left: 480px;
         color: #fff;
       }
+      .row {
+        margin-left: 0;
+        margin-right: 0;
+      }
+      .btnSaveTop {
+        display: none;
+        margin-left: 13px;
+      }
+      .msg-product {
+        width: 50px;
+        margin: 10px 10px;
+      }
     </style>
   </head>
 
@@ -99,14 +111,22 @@
     <!-- Tab links -->
     <div class="tab" id="tab">
       <button class="tablinks active" onclick="openTab(event, 'account')">Accounts</button>
-      <button class="tablinks" onclick="openTab(event, 'product')">Products</button>
+      <button class="tablinks" onclick="openTab(event, 'product', true)">Products</button>
       <button class="tablinks" onclick="openTab(event, 'category')">Category</button>
       <button class="tablinks" onclick="openTab(event, 'logs')">Logs</button>
     </div>
-    <div class="col-sm-12 text-right">
-      <button class="btn btn-warning btn-xs my-xs-btn btnImport" type="button" onclick="importFunc()">
-        <span class="glyphicon glyphicon-pencil"> Import Account </span>
-      </button>
+    <div class="row">
+      <div class="col-sm-6 text-left">
+        <button class="btn btn-primary btn-xs my-xs-btn btnSaveTop" type="button" onclick="saveProductFunc()">
+          <span class="glyphicon glyphicon-pencil">Save</span>
+        </button>
+        <span class="msg-product" style="display: none"></span>
+      </div>
+      <div class="col-sm-6 text-right">
+        <button class="btn btn-warning btn-xs my-xs-btn btnImport" type="button" onclick="importFunc()">
+          <span class="glyphicon glyphicon-pencil"> Import Account </span>
+        </button>
+      </div>
     </div>
     <div id="account" class="tabcontent" style="display: block">
       <table id="userTable" class="table table-hover">
@@ -171,9 +191,9 @@
       <div class="row">
         <div class="col">
           <button class="btn btn-primary btn-xs my-xs-btn btnSave" type="button" onclick="saveProductFunc()">
-            <span class="glyphicon glyphicon-pencil"></span> Save
+            <span class="glyphicon glyphicon-pencil">Save</span>
           </button>
-          <div id="msg-product"></div>
+          <div class="msg-product"></div>
         </div>
       </div>
       <!-- <textarea id="product-area" class="textarea"></textarea> -->
@@ -229,7 +249,7 @@
       let department5 = document.getElementById("department-5");
       let ul = document.querySelector("ul");
       let categoryInput = document.getElementById("input-category");
-      const msgDiv = document.querySelector("#msg-product");
+      const msgDiv = document.querySelectorAll(".msg-product");
       const msgCate = document.querySelector("#msg-cate");
       const categoryPath =
         process.env.NODE_ENV === "development"
@@ -346,8 +366,8 @@
         });
       });
 
-      function openTab(evt, tabName) {
-        var i, tabcontent, tablinks;
+      function openTab(evt, tabName, showSaveBtn = false) {
+        let i, tabcontent, tablinks, btnsavetop;
         tabcontent = document.getElementsByClassName("tabcontent");
         for (i = 0; i < tabcontent.length; i++) {
           tabcontent[i].style.display = "none";
@@ -358,6 +378,12 @@
         }
         document.getElementById(tabName).style.display = "block";
         evt.currentTarget.className += " active";
+        btnsavetop = document.querySelector(".btnSaveTop");
+        if (showSaveBtn) {
+          btnsavetop.style.display = "block";
+        } else {
+          btnsavetop.style.display = "none";
+        }
       }
 
       function selectFunc(arrayData) {
@@ -395,12 +421,14 @@
               log.error(err);
               throw err;
             }
-            msgDiv.style.display = "block";
-            msgDiv.className = "alert alert-success alert-dismissible show";
-            msgDiv.innerHTML = "Successfully Saved";
-            setTimeout(() => {
-              msgDiv.style.display = "none";
-            }, 2000);
+            msgDiv.forEach((ele) => {
+              ele.style.display = "block";
+              ele.className = "alert alert-success alert-dismissible show";
+              ele.innerHTML = "Successfully Saved";
+              setTimeout(() => {
+                ele.style.display = "none";
+              }, 2000);
+            });
           });
         });
       }

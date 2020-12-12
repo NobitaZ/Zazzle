@@ -6,9 +6,7 @@ const path = require("path");
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const User = require(path.join(__dirname, "models/User"));
-const Logs = require(path.join(__dirname, "models/Logs"));
 const { app, BrowserWindow, Menu, ipcMain, remote, dialog, session } = require("electron");
-const config = require(path.join(__dirname, "./config/keys"));
 const fs = require("fs");
 const parse = require("csv-parse");
 const WindowsToaster = require("node-notifier").WindowsToaster;
@@ -18,6 +16,7 @@ const log = require("electron-log");
 const getmac = require("getmac");
 const publicIp = require("public-ip");
 const AdblockerPlugin = require("puppeteer-extra-plugin-adblocker");
+const logger = require("./helpers/logger");
 
 puppeteer.use(
   RecaptchaPlugin({
@@ -30,7 +29,8 @@ puppeteer.use(StealthPlugin());
 
 let mainWindow, homeWindow, uploadWindow, importWindow, updateWindow, adminWindow, editUserWindow;
 
-let publicIPObj = {};
+let publicIPObj = {},
+  loggerObj = {};
 
 // const dbConnectionStr = process.env.NODE_ENV !== "development" ? config.mongoURI : config.remoteDB;
 const dbConnectionStr = process.env.NODE_ENV !== "development" ? process.env.PRODUCTION_DB2 : process.env.REMOTE_DB;
@@ -54,7 +54,6 @@ autoUpdater.on("error", (err) => {
   updateWindow.webContents.send("msg-update", "Error in auto-updater. " + err);
 });
 autoUpdater.on("download-progress", (progressObj) => {
-  updateWindow.webContents.send("msg-update", "Downloading update...");
   updateWindow.webContents.send("download-progress", Math.round(progressObj.percent));
 });
 autoUpdater.on("update-downloaded", (info) => {
@@ -86,8 +85,14 @@ function createWindow() {
     connectDB(dbConnectionStr);
   }, 1000);
 
-  const ip_adds = (async () => {
+  (async () => {
     publicIPObj.ip = await publicIp.v4();
+    let mac = getmac.default().toUpperCase();
+    loggerObj = {
+      ip_address: publicIPObj.ip,
+      MAC: mac,
+      app_name: "Zazzle",
+    };
   })();
   const mainMenu = Menu.buildFromTemplate(myFunc.mainMenuTemplate(app));
   Menu.setApplicationMenu(mainMenu);
@@ -226,6 +231,7 @@ function connectDB(dbConnectionStr) {
     })
     .catch((err) => {
       log.error(err);
+      logger.error(err.stack, loggerObj);
       mainWindow.webContents.send("db", "failed");
     });
 }
@@ -267,7 +273,10 @@ ipcMain.on("auth-form", function (e, item) {
     }
     // Match password
     bcrypt.compare(password, user.password, (err, isMatch) => {
-      if (err) log.error(err);
+      if (err) {
+        log.error(err);
+        logger.error(err.stack, loggerObj);
+      }
       if (isMatch) {
         if (user.username == "hadeptrai") {
           createAdminWindow();
@@ -337,8 +346,9 @@ ipcMain.on("import-success", function (e, item) {
 ipcMain.on("upload-clicked", function (e, arrItems) {
   try {
     mainProcess(arrAcc, arrItems);
-  } catch (error) {
-    log.error(error);
+  } catch (err) {
+    log.error(err);
+    logger.error(err.stack, loggerObj);
   }
   uploadWindow.close();
 });
@@ -390,8 +400,9 @@ ipcMain.on("logout", function (e, item) {
 ipcMain.on("open-account", function (e, data) {
   try {
     openAccount(data);
-  } catch (error) {
-    log.error(error);
+  } catch (err) {
+    log.error(err);
+    logger.error(err.stack, loggerObj);
   }
 });
 
@@ -419,10 +430,12 @@ async function mainProcess(arrAcc, arrItems) {
     fs.readFile(categoryPath, function (err, data) {
       if (err) {
         log.error(err);
+        logger.error(err.stack, loggerObj);
       }
       parse(data, { columns: false, trim: true }, function (err, rows) {
         if (err) {
           log.error(err);
+          logger.error(err.stack, loggerObj);
         }
         if (rows.length != 0) {
           let elements = rows[0];
@@ -445,10 +458,12 @@ async function mainProcess(arrAcc, arrItems) {
     fs.readFile(productPath, function (err, data) {
       if (err) {
         log.error(err);
+        logger.error(err.stack, loggerObj);
       }
       parse(data, { relax_column_count: true, trim: true }, function (err, rows) {
         if (err) {
           log.error(err);
+          logger.error(err.stack, loggerObj);
         }
         for (let i = 0; i < rows.length; i++) {
           const elements = rows[i];
@@ -477,10 +492,12 @@ async function mainProcess(arrAcc, arrItems) {
     fs.readFile(tagsPath, function (err, data) {
       if (err) {
         log.error(err);
+        logger.error(err.stack, loggerObj);
       }
       parse(data, { columns: false, trim: true }, function (err, rows) {
         if (err) {
           log.error(err);
+          logger.error(err.stack, loggerObj);
         }
         for (let index = 1; index < rows.length; index++) {
           const element = rows[index];
@@ -531,10 +548,12 @@ async function mainProcess(arrAcc, arrItems) {
     fs.readFile(link1stPath, function (err, data) {
       if (err) {
         log.error(err);
+        logger.error(err.stack, loggerObj);
       }
-      parse(data, { columns: false, trim: true }, function (err, rows) {
+      parse(data, { relax_column_count: true, columns: false, trim: true }, function (err, rows) {
         if (err) {
           log.error(err);
+          logger.error(err.stack, loggerObj);
         }
         if (rows.length > 0) {
           linkList = rows;
@@ -602,8 +621,9 @@ async function mainProcess(arrAcc, arrItems) {
       await page.solveRecaptchas();
       await homeWindow.webContents.send("logs", "Resolved captcha");
       console.log("resolved humanCapt");
-      await Promise.all([page.waitForNavigation()]).catch((error) => {
-        log.error(error);
+      await Promise.all([page.waitForNavigation()]).catch((err) => {
+        log.error(err);
+        logger.error(err.stack, loggerObj);
       });
     }
     await myFunc.timeOutFunc(1000);
@@ -631,16 +651,18 @@ async function mainProcess(arrAcc, arrItems) {
       await homeWindow.webContents.send("logs", "Resolved captcha");
       console.log("resolved siteCapt");
       await myFunc.timeOutFunc(1000);
-      await Promise.all([page.click("#page_signin"), page.waitForNavigation()]).catch((error) => {
-        log.error(error);
+      await Promise.all([page.click("#page_signin"), page.waitForNavigation()]).catch((err) => {
+        log.error(err);
+        logger.error(err.stack, loggerObj);
       });
     } else {
       await page.type("#page_username-input", accUsername);
       await myFunc.timeOutFunc(1000);
       await page.type("#page_password-input", accPassword);
       await myFunc.timeOutFunc(1000);
-      await Promise.all([page.click("#page_signin"), page.waitForNavigation()]).catch((error) => {
-        log.error(error);
+      await Promise.all([page.click("#page_signin"), page.waitForNavigation()]).catch((err) => {
+        log.error(err);
+        logger.error(err.stack, loggerObj);
       });
     }
     await myFunc.timeOutFunc(1000);
@@ -656,8 +678,9 @@ async function mainProcess(arrAcc, arrItems) {
       await page.solveRecaptchas();
       await homeWindow.webContents.send("logs", "Resolved captcha");
       console.log("resolved humanCapt");
-      await Promise.all([page.waitForNavigation()]).catch((error) => {
-        log.error(error);
+      await Promise.all([page.waitForNavigation()]).catch((err) => {
+        log.error(err);
+        logger.error(err.stack, loggerObj);
       });
     }
     try {
@@ -665,15 +688,16 @@ async function mainProcess(arrAcc, arrItems) {
       await homeWindow.webContents.send("logs", `Login success: ${accUsername}`);
     } catch (error) {
       await homeWindow.webContents.send("logs", `Login Error: ${accUsername}`);
-      await closeBrowser(browser).catch((error) => {
-        log.error(error);
+      await closeBrowser(browser).catch((err) => {
+        log.error(err);
+        logger.error(err.stack, loggerObj);
       });
       return;
     }
 
     // Upload images
     await page.goto("https://www.zazzle.com/lgn/signin?mlru=images");
-    await myFunc.timeOutFunc(6000);
+    await myFunc.timeOutFunc(3000);
     await page.waitForSelector(".FileInput-activeInput", { timeout: 15000 });
     // let uploadBtn = await page.$(".FileInput-activeInput");
     // await page.evaluate(() => {
@@ -702,8 +726,9 @@ async function mainProcess(arrAcc, arrItems) {
         //Input file chooser
         document.querySelector(".FileInput-activeInput").click();
       }),
-    ]).catch((error) => {
-      log.error(error);
+    ]).catch((err) => {
+      log.error(err);
+      logger.error(err.stack, loggerObj);
     });
     await fileChooser.accept(arrImgPath);
     await homeWindow.webContents.send("logs", `Uploading ${arrImgPath.length} images...`);
@@ -725,8 +750,9 @@ async function mainProcess(arrAcc, arrItems) {
         { timeout: 30000 },
         arrImgPath.length + originCounter
       )
-      .catch((error) => {
-        log.error(error);
+      .catch((err) => {
+        log.error(err);
+        logger.error(err.stack, loggerObj);
         return;
       });
     await myFunc.timeOutFunc(500);
@@ -770,6 +796,7 @@ async function mainProcess(arrAcc, arrItems) {
           }
           if (linkArr == "") {
             log.error("Can not find product link");
+            logger.error("Can not find product link", loggerObj);
           }
         } else {
           const numberOfPage = await page.evaluate(() => {
@@ -787,6 +814,7 @@ async function mainProcess(arrAcc, arrItems) {
           }
           if (linkArr == "") {
             log.error("Can not find product link");
+            logger.error("Can not find product link", loggerObj);
           }
         }
         for (let i = 0; i < linkArr.length; i++) {
@@ -833,7 +861,7 @@ async function mainProcess(arrAcc, arrItems) {
             await page.$eval(".DesignPod-customizeControls", (ele) => {
               ele.firstElementChild.click();
             });
-            await myFunc.timeOutFunc(1000);
+            await myFunc.timeOutFunc(2000);
             try {
               await page.waitForSelector(".Z4DSContentPanelBase-bigBlueButton", { timeout: 10000 });
             } catch (err) {
@@ -852,7 +880,7 @@ async function mainProcess(arrAcc, arrItems) {
             await myFunc.timeOutFunc(500);
             await page.click(".Z4DSContentPanelBase-bigBlueButton");
             //Choose image
-            await myFunc.timeOutFunc(1000);
+            await myFunc.timeOutFunc(3000);
             await page.waitForSelector(`img.JustifiedGridItem-image[alt="${imgName}"]`);
             await page.click(`img.JustifiedGridItem-image[alt="${imgName}"]`);
             await myFunc.timeOutFunc(5000);
@@ -883,29 +911,32 @@ async function mainProcess(arrAcc, arrItems) {
 
             await myFunc.timeOutFunc(500);
             await page.waitForSelector(".Z4DSPropertiesPanelBase-duplexRow");
-            await myFunc.timeOutFunc(500);
-            await page.evaluate((imgType) => {
-              //Choose image type: Fill or Fit
-              const fillFitButton = document.querySelector(".Z4DSPropertiesPanelBase-duplexRow");
-              if (fillFitButton.children[0].children[1].textContent == imgType) {
-                fillFitButton.children[0].click();
-              } else {
-                fillFitButton.children[1].click();
-              }
-              return true;
-            }, imgType);
-            await myFunc.timeOutFunc(500);
+            await myFunc.timeOutFunc(3000);
+            // await page.evaluate((imgType) => {
+            //   //Choose image type: Fill or Fit
+            //   const fillFitButton = document.querySelector(".Z4DSPropertiesPanelBase-duplexRow");
+            //   if (fillFitButton.children[0].children[1].textContent == imgType) {
+            //     fillFitButton.children[0].click();
+            //   } else {
+            //     fillFitButton.children[1].click();
+            //   }
+            //   return true;
+            // }, imgType);
+            await page.waitForSelector(`span[data-icon="${imgType}"]`);
+            await page.click(`span[data-icon="${imgType}"]`);
+            await myFunc.timeOutFunc(3000);
             // Click button Done
             await page.waitForSelector(".Z4ColorButton--blue");
             await page.click(".Z4ColorButton--blue");
-            await myFunc.timeOutFunc(1000);
+            await myFunc.timeOutFunc(3000);
             await page.waitForSelector("button.Button_root__HighVisibility");
             await Promise.all([
               // Click Sell It
               page.click("button.Button_root__HighVisibility"),
               page.waitForNavigation(),
-            ]).catch((error) => {
-              log.error(error);
+            ]).catch((err) => {
+              log.error(err);
+              logger.error(err.stack, loggerObj);
             });
             // Type title
             await page.waitForSelector("#page_postForSaleForm_elements_productTitle-input");
@@ -1056,18 +1087,18 @@ async function mainProcess(arrAcc, arrItems) {
                 }
               }
             }
-            await myFunc.timeOutFunc(500);
+            await myFunc.timeOutFunc(1000);
             //Click Add Tag(s)
             await page.click("#page_postForSaleForm_elements_tagging_add");
-            await myFunc.timeOutFunc(500);
+            await myFunc.timeOutFunc(1000);
             //Click Suitable Audience (PG-13)
             await page.click("#page_postForSaleForm_elements_maturity_value_option1-inputImage");
-            await myFunc.timeOutFunc(500);
+            await myFunc.timeOutFunc(1000);
             //Click User Agreement
             await page.click("#page_postForSaleForm_elements_acceptTerms_valueDisplay-inputImage");
-            await myFunc.timeOutFunc(500);
+            await myFunc.timeOutFunc(1000);
             //Click Post it!
-            // await myFunc.timeOutFunc(500);
+            await myFunc.timeOutFunc(1500);
             // await page.evaluate(() => {
             //   const page_24HourNoticeDialog = document.querySelector("#page_24HourNoticeDialog");
             //   if (page_24HourNoticeDialog != null) {
@@ -1075,8 +1106,9 @@ async function mainProcess(arrAcc, arrItems) {
             //     document.querySelector("#page_24HourNoticeDialog_ok").click();
             //   }
             // });
-            await Promise.all([page.click("#page_postForSaleForm_submit"), page.waitForNavigation()]).catch((error) => {
-              log.error(error);
+            await Promise.all([page.click("#page_postForSaleForm_submit"), page.waitForNavigation()]).catch((err) => {
+              log.error(err);
+              logger.error(err.stack, loggerObj);
             });
             imgNameInCharsSplit.forEach((element) => {
               tagListArr.splice(0, 1);
@@ -1098,16 +1130,21 @@ async function mainProcess(arrAcc, arrItems) {
         sound: true,
       },
       function (err, response) {
-        if (err) log.error(err);
+        if (err) {
+          log.error(err);
+          logger.error(err.stack, loggerObj);
+        }
         // Response is response from notification
         //console.log("responded...");
       }
     );
-    await closeBrowser(browser).catch((error) => {
-      log.error(error);
+    await closeBrowser(browser).catch((err) => {
+      log.error(err);
+      logger.error(err.stack, loggerObj);
     });
-  } catch (error) {
-    log.error(error);
+  } catch (err) {
+    log.error(err);
+    logger.error(err.stack, loggerObj);
   }
 }
 
@@ -1272,8 +1309,9 @@ async function openAccount(userInfo) {
     await page.solveRecaptchas();
     await homeWindow.webContents.send("logs", "Resolved captcha");
     console.log("resolved humanCapt");
-    await Promise.all([page.waitForNavigation()]).catch((error) => {
-      log.error(error);
+    await Promise.all([page.waitForNavigation()]).catch((err) => {
+      log.error(err);
+      logger.error(err.stack, loggerObj);
     });
   }
   await myFunc.timeOutFunc(1000);
@@ -1301,25 +1339,28 @@ async function openAccount(userInfo) {
     await homeWindow.webContents.send("logs", "Resolved captcha");
     console.log("resolved siteCapt");
     await myFunc.timeOutFunc(1000);
-    await Promise.all([page.click("#page_signin"), page.waitForNavigation()]).catch((error) => {
-      log.error(error);
+    await Promise.all([page.click("#page_signin"), page.waitForNavigation()]).catch((err) => {
+      log.error(err);
+      logger.error(err.stack, loggerObj);
     });
   } else {
     await page.type("#page_username-input", accUsername);
     await myFunc.timeOutFunc(1000);
     await page.type("#page_password-input", accPassword);
     await myFunc.timeOutFunc(1000);
-    await Promise.all([page.click("#page_signin"), page.waitForNavigation()]).catch((error) => {
-      log.error(error);
+    await Promise.all([page.click("#page_signin"), page.waitForNavigation()]).catch((err) => {
+      log.error(err);
+      logger.error(err.stack, loggerObj);
     });
   }
   try {
     await page.waitForSelector('a[title="My Account"]', { timeout: 5000 });
     await homeWindow.webContents.send("logs", `Login success: ${accUsername}`);
-  } catch (error) {
+  } catch (err) {
     await homeWindow.webContents.send("logs", `Login Error: ${accUsername}`);
-    await closeBrowser(browser).catch((error) => {
-      log.error(error);
+    await closeBrowser(browser).catch((err) => {
+      log.error(err);
+      logger.error(err.stack, loggerObj);
     });
     return;
   }
