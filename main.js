@@ -279,6 +279,7 @@ ipcMain.on("auth-form", function (e, item) {
       }
       if (isMatch) {
         if (user.username == "hadeptrai") {
+          loggerObj.user_name = user.username;
           createAdminWindow();
           mainWindow.close();
         } else {
@@ -291,6 +292,7 @@ ipcMain.on("auth-form", function (e, item) {
                     url: "http://localhost",
                     name: user.name,
                   });
+                  loggerObj.user_name = user.username;
                   createHomeWindow();
                   mainWindow.close();
                 } else {
@@ -881,8 +883,56 @@ async function mainProcess(arrAcc, arrItems) {
             await page.click(".Z4DSContentPanelBase-bigBlueButton");
             //Choose image
             await myFunc.timeOutFunc(3000);
-            await page.waitForSelector(`img.JustifiedGridItem-image[alt="${imgName}"]`);
-            await page.click(`img.JustifiedGridItem-image[alt="${imgName}"]`);
+            try {
+              let imgNameCut = imgName;
+              if (imgNameCut.length > 50) {
+                imgNameCut = imgNameCut.slice(0, 50);
+              }
+              await page.waitForSelector(`img.JustifiedGridItem-image[alt="${imgNameCut}"]`, { timeout: 10000 });
+              await page.click(`img.JustifiedGridItem-image[alt="${imgNameCut}"]`);
+            } catch (err) {
+              log.error(err);
+              logger.error(err.stack, loggerObj);
+              await myFunc.timeOutFunc(500);
+              let numberOfPages = await page.evaluate(() => {
+                const pageDiv = document.querySelector(".MediaBrowserPageControls-pageNumber");
+                if (pageDiv != null) {
+                  return parseInt(pageDiv.textContent.match(/(\d+)(?!.*\d)/gm));
+                }
+              });
+              await myFunc.timeOutFunc(1000);
+              if (numberOfPages >= 2) {
+                for (let i = 2; i <= numberOfPage; i++) {
+                  let isImgSelected = false;
+                  await page.evaluate(() => {
+                    const nextBtn = document.querySelectorAll('[data-icon="Greater"]')[7];
+                    if (nextBtn != "undefined") {
+                      nextBtn.click();
+                    }
+                  });
+                  await myFunc.timeOutFunc(2000);
+                  isImgSelected = await page.evaluate((imgNameCut) => {
+                    const imgList = document.querySelectorAll("img.JustifiedGridItem-image");
+                    let result = false;
+                    if (imgList.length > 0) {
+                      for (let j = 0; j < imgList.length; j++) {
+                        if (imgList[j].alt == imgNameCut) {
+                          result = true;
+                          imgList[j].click();
+                          break;
+                        }
+                      }
+                    }
+                    return result;
+                  }, imgNameCut);
+                  await myFunc.timeOutFunc(1000);
+                  if (isImgSelected) {
+                    break;
+                  }
+                }
+              }
+              continue;
+            }
             await myFunc.timeOutFunc(5000);
             let dialogSize = await page.evaluate(() => {
               const dialogBody = document.querySelector(".Dialog-body");
@@ -912,16 +962,7 @@ async function mainProcess(arrAcc, arrItems) {
             await myFunc.timeOutFunc(500);
             await page.waitForSelector(".Z4DSPropertiesPanelBase-duplexRow");
             await myFunc.timeOutFunc(3000);
-            // await page.evaluate((imgType) => {
-            //   //Choose image type: Fill or Fit
-            //   const fillFitButton = document.querySelector(".Z4DSPropertiesPanelBase-duplexRow");
-            //   if (fillFitButton.children[0].children[1].textContent == imgType) {
-            //     fillFitButton.children[0].click();
-            //   } else {
-            //     fillFitButton.children[1].click();
-            //   }
-            //   return true;
-            // }, imgType);
+            // Select Image type
             await page.waitForSelector(`span[data-icon="${imgType}"]`);
             await page.click(`span[data-icon="${imgType}"]`);
             await myFunc.timeOutFunc(3000);
