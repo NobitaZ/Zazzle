@@ -70,6 +70,17 @@
       const path = require("path");
       const fs = require("fs");
 
+      const categoryPath =
+        process.env.NODE_ENV === "development"
+          ? "./data/category.csv"
+          : path.join(process.resourcesPath, "data/category.csv");
+      const productPath =
+        process.env.NODE_ENV === "development"
+          ? "./data/product.csv"
+          : path.join(process.resourcesPath, "data/product.csv");
+      const productData = fs.readFileSync(productPath, "utf8");
+      const categoryData = fs.readFileSync(categoryPath, "utf8");
+
       const fileName = document.getElementById("file-name");
       let tagName = document.getElementById("tagname");
       tagName.value = "anime,my hero academia";
@@ -131,10 +142,11 @@
           const errMsgBox = dialog.showErrorBox("No Tag Name !!!", "");
         } else if (!tagName.value.includes(",")) {
           const errMsgBox = dialog.showErrorBox("Wrong format Tag Name !!!", "");
-          // } else if (departmentName.value == "") {
-          //   const errMsgBox = dialog.showErrorBox("No Marketplace Department !!!", "");
+        } else if (productData == "") {
+          const errMsgBox = dialog.showErrorBox("No product found !!!", "");
+        } else if (categoryData == "") {
+          const errMsgBox = dialog.showErrorBox("No category found !!!", "");
         } else {
-          //   const items = [arrImgs, tagName.value, imgType.value, departmentName.value];
           const items = [arrImgs, tagName.value, imgType.value];
           ipcRenderer.send("upload-clicked", items);
         }
